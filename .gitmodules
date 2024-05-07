@@ -7,3 +7,6 @@
 [submodule "lib/prb-test"]
 	path = lib/prb-test
 	url = https://github.com/paulrberg/prb-test
+[submodule "lib/eigenlayer-fuzzing"]
+	path = lib/eigenlayer-fuzzing
+	url = https://github.com/nican0r/eigenlayer-fuzzing
