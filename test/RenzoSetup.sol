@@ -44,7 +44,7 @@ contract RenzoSetup is EigenLayerSetup {
     OperatorDelegator public operatorDelegator2;
     OperatorDelegator public operatorDelegatorImplementation;
 
-    function setUp() public {
+    function deployRenzo() public {
         renzoProxyAdmin = new ProxyAdmin();
 
         // deploy RoleManager proxy

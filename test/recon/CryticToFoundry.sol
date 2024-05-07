@@ -12,6 +12,6 @@ contract CryticToFoundry is Test, RestakeManagerTargets, FoundryAsserts {
     }
 
     function testDemo() public {
-        // TODO: Given any target function and foundry assert, test your results
+        console2.log("restake manager: ", address(restakeManager));
     }
 }
