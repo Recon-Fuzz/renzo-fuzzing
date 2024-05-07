@@ -11,4 +11,20 @@ abstract contract RestakeManagerTargets is BaseTargetFunctions, Properties, Befo
     function restakeManager_deposit(IERC20 collateralToken, uint256 amount) public {
         restakeManager.deposit(collateralToken, amount);
     }
+
+    function restakeManager_depositReferral(
+        IERC20 collateralToken,
+        uint256 amount,
+        uint256 referralId
+    ) public {
+        restakeManager.deposit(collateralToken, amount, referralId);
+    }
+
+    function restakeManager_depositETH() public payable {
+        restakeManager.depositETH();
+    }
+
+    function restakeManager_depositETHReferral(uint256 referralId) public payable {
+        restakeManager.depositETH(referralId);
+    }
 }
