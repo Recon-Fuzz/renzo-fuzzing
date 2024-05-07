@@ -1,6 +1,7 @@
 @chainlink/=node_modules/@chainlink/
 @eth-optimism/=node_modules/@chainlink/contracts/node_modules/@eth-optimism/
 @openzeppelin/=node_modules/@openzeppelin/
+@chimera/=lib/chimera/src/
 ds-test/=lib/forge-std/lib/ds-test/src/
 eth-gas-reporter/=node_modules/eth-gas-reporter/
 forge-std/=lib/forge-std/src

@@ -17,7 +17,7 @@ import "test/mocks/MockERC20.sol";
 import "test/mocks/MockAggregatorV3.sol";
 import "forge-std/console2.sol";
 
-contract SharedSetup is EigenLayerSetup {
+contract RenzoSetup is EigenLayerSetup {
     // EigenLayerSetup sets the admin address using this
     // address admin = address(this);
 
@@ -114,7 +114,6 @@ contract SharedSetup is EigenLayerSetup {
         renzoOracle.setOracleAddress(cbETH, AggregatorV3Interface(address(cbEthPriceOracle)));
 
         // deploy EigenLayer to be able to access StrategyManager and DelegationManager
-        // @audit need to change this to use the new function interface
         address[] memory lstAddresses = new address[](2);
         lstAddresses[0] = address(stETH);
         lstAddresses[1] = address(cbETH);

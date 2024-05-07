@@ -10,3 +10,6 @@
 [submodule "lib/eigenlayer-fuzzing"]
 	path = lib/eigenlayer-fuzzing
 	url = https://github.com/nican0r/eigenlayer-fuzzing
+[submodule "lib/chimera"]
+	path = lib/chimera
+	url = https://github.com/Recon-Fuzz/chimera
