@@ -152,3 +152,8 @@ cache_forge
 
 # localhost deployments
 deployments/localhost
+
+# Fuzzing
+medusa/ 
+echidna/
+crytic-export/
