@@ -114,7 +114,11 @@ contract SharedSetup is EigenLayerSetup {
         renzoOracle.setOracleAddress(cbETH, AggregatorV3Interface(address(cbEthPriceOracle)));
 
         // deploy EigenLayer to be able to access StrategyManager and DelegationManager
-        deployEigenLayer(address(stETH), address(cbETH), stETH.symbol(), cbETH.symbol());
+        // @audit need to change this to use the new function interface
+        address[] memory lstAddresses = new address[](2);
+        lstAddresses[0] = address(stETH);
+        lstAddresses[1] = address(cbETH);
+        deployEigenLayer(lstAddresses);
 
         // deploy DepositQueue
         depositQueueImplementation = new DepositQueue();
