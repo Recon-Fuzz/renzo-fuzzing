@@ -77,6 +77,7 @@ contract RenzoSetup is EigenLayerSetup {
                 )
             )
         );
+        ezETH.initialize(roleManager);
         stETH = new MockERC20("Staked ETH", "stETH", 18);
         cbETH = new MockERC20("Coinbase ETH", "cbETH", 18);
 
