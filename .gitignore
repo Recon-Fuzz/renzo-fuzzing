@@ -157,3 +157,4 @@ deployments/localhost
 medusa/ 
 echidna/
 crytic-export/
+.env
