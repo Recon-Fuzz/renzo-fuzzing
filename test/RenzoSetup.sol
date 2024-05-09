@@ -21,30 +21,31 @@ contract RenzoSetup is EigenLayerSetup {
     // EigenLayerSetup sets the admin address using this
     // address admin = address(this);
 
-    ProxyAdmin public renzoProxyAdmin;
-    RoleManager public roleManager;
-    RoleManager public roleManagerImplementation;
-    EzEthToken public ezETH;
-    EzEthToken public ezETHImplementation;
-    MockERC20 public stETH;
-    MockERC20 public cbETH;
-    RenzoOracle public renzoOracle;
-    RenzoOracle public renzoOracleImplementation;
-    MockAggregatorV3 public stEthPriceOracle;
-    MockAggregatorV3 public cbEthPriceOracle;
-    DepositQueue public depositQueue;
-    DepositQueue public depositQueueImplementation;
-    RestakeManager public restakeManager;
-    RestakeManager public restakeManagerImplementation;
-    WithdrawQueue public withdrawQueue;
-    WithdrawQueue public withdrawQueueImplementation;
-    RewardHandler public rewardHandler;
-    RewardHandler public rewardHandlerImplementation;
-    OperatorDelegator public operatorDelegator1;
-    OperatorDelegator public operatorDelegator2;
-    OperatorDelegator public operatorDelegatorImplementation;
+    ProxyAdmin internal renzoProxyAdmin;
+    RoleManager internal roleManager;
+    RoleManager internal roleManagerImplementation;
+    EzEthToken internal ezETH;
+    EzEthToken internal ezETHImplementation;
+    MockERC20 internal stETH;
+    MockERC20 internal cbETH;
+    RenzoOracle internal renzoOracle;
+    RenzoOracle internal renzoOracleImplementation;
+    MockAggregatorV3 internal stEthPriceOracle;
+    MockAggregatorV3 internal cbEthPriceOracle;
+    DepositQueue internal depositQueue;
+    DepositQueue internal depositQueueImplementation;
+    RestakeManager internal restakeManager;
+    RestakeManager internal restakeManagerImplementation;
+    WithdrawQueue internal withdrawQueue;
+    WithdrawQueue internal withdrawQueueImplementation;
+    RewardHandler internal rewardHandler;
+    RewardHandler internal rewardHandlerImplementation;
+    OperatorDelegator internal operatorDelegator1;
+    OperatorDelegator internal operatorDelegator2;
+    OperatorDelegator internal operatorDelegatorImplementation;
 
-    function deployRenzo() public {
+    address[] internal lstAddresses;
+    function deployRenzo(bool eigenLayerLocal) internal {
         renzoProxyAdmin = new ProxyAdmin();
 
         // deploy RoleManager proxy
@@ -115,10 +116,21 @@ contract RenzoSetup is EigenLayerSetup {
         renzoOracle.setOracleAddress(cbETH, AggregatorV3Interface(address(cbEthPriceOracle)));
 
         // deploy EigenLayer to be able to access StrategyManager and DelegationManager
-        address[] memory lstAddresses = new address[](2);
-        lstAddresses[0] = address(stETH);
-        lstAddresses[1] = address(cbETH);
-        deployEigenLayer(lstAddresses);
+        lstAddresses.push(address(stETH));
+        lstAddresses.push(address(cbETH));
+
+        address[] memory strategyArray = new address[](2);
+        strategyArray[0] = address(0x54945180dB7943c0ed0FEE7EdaB2Bd24620256bc);
+        strategyArray[1] = address(0x93c4b944D05dfe6df7645A86cd2206016c51564D);
+
+        if (eigenLayerLocal) {
+            // this deploys EigenLayer strategies for the tokens passed in
+            deployEigenLayerLocal(lstAddresses);
+        } else {
+            // this takes in the strategies used by Renzo to expose their interfaces using EigenLayer contracts
+            // TODO: resolve array index out of bounds error when using this
+            deployEigenLayerForked(strategyArray);
+        }
 
         // deploy DepositQueue
         depositQueueImplementation = new DepositQueue();
