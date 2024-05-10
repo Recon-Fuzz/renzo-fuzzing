@@ -11,6 +11,8 @@ import { vm } from "@chimera/Hevm.sol";
 abstract contract RestakeManagerTargets is BaseTargetFunctions, Properties, BeforeAfter {
     function restakeManager_deposit(uint256 tokenIndex, uint256 amount) public {
         IERC20 collateralToken = IERC20(_getRandomDepositableToken(tokenIndex));
+        amount = amount % IERC20(collateralToken).balanceOf(address(this));
+
         restakeManager.deposit(collateralToken, amount);
     }
 
@@ -20,15 +22,21 @@ abstract contract RestakeManagerTargets is BaseTargetFunctions, Properties, Befo
         uint256 referralId
     ) public {
         IERC20 collateralToken = IERC20(_getRandomDepositableToken(tokenIndex));
+        amount = amount % IERC20(collateralToken).balanceOf(address(this));
+
         restakeManager.deposit(collateralToken, amount, referralId);
     }
 
     function restakeManager_depositETH() public payable {
-        restakeManager.depositETH();
+        (bool success, ) = address(restakeManager).call{ value: msg.value }(
+            abi.encodeWithSignature("depositETH()")
+        );
     }
 
     function restakeManager_depositETHReferral(uint256 referralId) public payable {
-        restakeManager.depositETH(referralId);
+        (bool success, ) = address(restakeManager).call{ value: msg.value }(
+            abi.encodeWithSignature("depositETH(uint256)", referralId)
+        );
     }
 
     function _getRandomDepositableToken(uint256 tokenIndex) internal view returns (address) {
