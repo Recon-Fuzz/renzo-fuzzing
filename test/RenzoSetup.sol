@@ -2,6 +2,7 @@
 pragma solidity 0.8.19;
 import { Test } from "forge-std/Test.sol";
 import { EigenLayerSetup } from "eigenlayer/test/recon/EigenLayerSetup.sol";
+import { vm } from "@chimera/Hevm.sol";
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "test/helpers/ProxyAdmin.sol";
 import "contracts/Permissions/RoleManager.sol";
@@ -82,6 +83,10 @@ contract RenzoSetup is EigenLayerSetup {
         stETH = new MockERC20("Staked ETH", "stETH", 18);
         cbETH = new MockERC20("Coinbase ETH", "cbETH", 18);
 
+        // mint LSTs to the target contract
+        stETH.mint(address(this), 100_000);
+        cbETH.mint(address(this), 100_000);
+
         // deploy oracle, needs to be done as a proxy
         renzoOracleImplementation = new RenzoOracle();
         renzoOracle = RenzoOracle(
@@ -95,6 +100,7 @@ contract RenzoSetup is EigenLayerSetup {
         );
         renzoOracle.initialize(roleManager);
 
+        vm.warp(1524785992); // warps to echidna's initial start time
         stEthPriceOracle = new MockAggregatorV3(
             18, // decimals
             "stETH price oracle", // description
@@ -111,6 +117,12 @@ contract RenzoSetup is EigenLayerSetup {
             block.timestamp,
             block.timestamp
         );
+
+        (, int256 answer, uint256 startedAt, uint256 updatedAt, ) = stEthPriceOracle
+            .latestRoundData();
+        console2.log("stEth answer: ", answer);
+        console2.log("stEth updated at: ", updatedAt);
+        console2.log("startedAt: ", startedAt);
 
         renzoOracle.setOracleAddress(stETH, AggregatorV3Interface(address(stEthPriceOracle)));
         renzoOracle.setOracleAddress(cbETH, AggregatorV3Interface(address(cbEthPriceOracle)));
