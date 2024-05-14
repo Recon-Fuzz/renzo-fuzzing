@@ -120,9 +120,6 @@ contract RenzoSetup is EigenLayerSetup {
 
         (, int256 answer, uint256 startedAt, uint256 updatedAt, ) = stEthPriceOracle
             .latestRoundData();
-        console2.log("stEth answer: ", answer);
-        console2.log("stEth updated at: ", updatedAt);
-        console2.log("startedAt: ", startedAt);
 
         renzoOracle.setOracleAddress(stETH, AggregatorV3Interface(address(stEthPriceOracle)));
         renzoOracle.setOracleAddress(cbETH, AggregatorV3Interface(address(cbEthPriceOracle)));
@@ -180,6 +177,10 @@ contract RenzoSetup is EigenLayerSetup {
             IDelegationManager(address(delegation)),
             depositQueue
         );
+
+        // approve the RestakeManager to spend the target's tokens
+        stETH.approve(address(restakeManager), type(uint256).max);
+        cbETH.approve(address(restakeManager), type(uint256).max);
 
         // deploy WithdrawQueue
         withdrawQueueImplementation = new WithdrawQueue();
