@@ -39,6 +39,18 @@ abstract contract RestakeManagerTargets is BaseTargetFunctions, Properties, Befo
         );
     }
 
+    // NOTE: danger, setting TVL limits is probably an action that will be taken by admins infrequently
+    // breaking properties that result from this may need a better mechanism for switching limits, potentially a binary for on and off without caring about limit amount
+    function restakeManager_setTokenTvlLimit(uint256 tokenIndex, uint256 amount) public {
+        address tokenToLimit = _getRandomDepositableToken(tokenIndex);
+
+        restakeManager.setTokenTvlLimit(IERC20(tokenToLimit), amount);
+    }
+
+    // NOTE: danger, this allows the fuzzer to fill the buffer but may have unintended side-effects in withdrawals
+    // function restakeManager_fillBuffer() public {
+    // }
+
     function _getRandomDepositableToken(uint256 tokenIndex) internal view returns (address) {
         return lstAddresses[tokenIndex % lstAddresses.length];
     }
