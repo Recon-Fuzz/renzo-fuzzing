@@ -61,8 +61,8 @@ abstract contract RestakeManagerTargets is BaseTargetFunctions, Properties, Befo
     // @audit currently ETH deposit contract is being mocked by ETHPOSDepositMock so signature values are irrelevant
     function restakeManager_stakeEthFromQueue(
         uint256 operatorDelegatorIndex,
-        bytes calldata pubkey,
-        bytes calldata signature,
+        bytes memory pubkey,
+        bytes memory signature,
         bytes32 depositDataRoot
     ) public {
         IOperatorDelegator operatorDelegator = _getRandomOperatorDelegator(operatorDelegatorIndex);
