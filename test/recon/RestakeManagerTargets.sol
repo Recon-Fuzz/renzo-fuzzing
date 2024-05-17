@@ -79,11 +79,19 @@ abstract contract RestakeManagerTargets is
         IERC20(collateralToken).transfer(address(depositQueue.withdrawQueue()), bufferToFill);
     }
 
+    // @notice simulates accrual of staking rewards that get sent to DepositQueue
+    // @dev this is needed to allow coverage of the depositTokenRewardsFromProtocol function
+    function restakeManager_simulateRewardsAccrual(
+        uint256 collateralTokenIndex,
+        uint256 amount
+    ) public {
+        address collateralToken = _getRandomDepositableToken(collateralTokenIndex);
+        amount = amount % IERC20(collateralToken).balanceOf(address(this));
+
+        IERC20(collateralToken).transfer(address(depositQueue), amount);
+    }
+
     function restakeManager_slash() public {
         ethPOSDepositMock.slash();
     }
-
-    // function restakeManager_emptyBuffer() public {
-
-    // }
 }

@@ -35,9 +35,9 @@ contract CryticToFoundry is Test, RestakeManagerTargets, FoundryAsserts {
         restakeManager_stakeEthFromQueue(2, pubkey, signature, bytes32(uint256(0xbeef)));
     }
 
-    function test_sweepERC20() public {
+    function test_depositTokenRewardsFromProtocol() public {
         // send tokens to DepositQueue first
-        stETH.transfer(address(depositQueue), 200);
+        restakeManager_simulateRewardsAccrual(2, 200);
 
         restakeManager_depositTokenRewardsFromProtocol(2);
     }
