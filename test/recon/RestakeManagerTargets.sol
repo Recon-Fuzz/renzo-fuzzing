@@ -2,14 +2,20 @@
 pragma solidity ^0.8.0;
 
 import { BaseTargetFunctions } from "@chimera/BaseTargetFunctions.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { vm } from "@chimera/Hevm.sol";
 import { BeforeAfter } from "./BeforeAfter.sol";
 import { Properties } from "./Properties.sol";
 import { IOperatorDelegator } from "../../contracts/Delegation/IOperatorDelegator.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { vm } from "@chimera/Hevm.sol";
+import { DepositQueueTargets } from "./DepositQueueTargets.sol";
 
 // TODO: include setPrice for aggregator in different contract
-abstract contract RestakeManagerTargets is BaseTargetFunctions, Properties, BeforeAfter {
+abstract contract RestakeManagerTargets is
+    BaseTargetFunctions,
+    Properties,
+    BeforeAfter,
+    DepositQueueTargets
+{
     function restakeManager_deposit(uint256 tokenIndex, uint256 amount) public {
         IERC20 collateralToken = IERC20(_getRandomDepositableToken(tokenIndex));
         amount = amount % IERC20(collateralToken).balanceOf(address(this));
@@ -47,10 +53,7 @@ abstract contract RestakeManagerTargets is BaseTargetFunctions, Properties, Befo
 
     // NOTE: this is a privileged function that's called by the DepositQueue to sweep ERC20 rewards tokens into RestakeManager
     function restakeManager_depositTokenRewardsFromProtocol(uint256 tokenIndex) public {
-        address tokenToDeposit = _getRandomDepositableToken(tokenIndex);
-
-        // the call in depositQueue makes a call to depositTokenRewardsFromProtocol
-        depositQueue.sweepERC20(IERC20(tokenToDeposit));
+        depositQueue_depositTokenRewardsFromProtocol(tokenIndex);
     }
 
     // NOTE: this needs to be included to complete the native ETH staking process
@@ -61,9 +64,7 @@ abstract contract RestakeManagerTargets is BaseTargetFunctions, Properties, Befo
         bytes memory signature,
         bytes32 depositDataRoot
     ) public {
-        IOperatorDelegator operatorDelegator = _getRandomOperatorDelegator(operatorDelegatorIndex);
-
-        depositQueue.stakeEthFromQueue(operatorDelegator, pubkey, signature, depositDataRoot);
+        depositQueue_stakeEthFromQueue(operatorDelegatorIndex, pubkey, signature, depositDataRoot);
     }
 
     // NOTE: danger, this allows the fuzzer to fill the buffer but may have unintended side-effects for overall system behavior
@@ -85,20 +86,4 @@ abstract contract RestakeManagerTargets is BaseTargetFunctions, Properties, Befo
     // function restakeManager_emptyBuffer() public {
 
     // }
-
-    function _getRandomDepositableToken(uint256 tokenIndex) internal view returns (address) {
-        return lstAddresses[tokenIndex % lstAddresses.length];
-    }
-
-    function _getRandomOperatorDelegator(
-        uint256 operatorDelegatorIndex
-    ) internal view returns (IOperatorDelegator operatorDelegator) {
-        IOperatorDelegator[] memory operatorDelegatorArray = new IOperatorDelegator[](
-            restakeManager.getOperatorDelegatorsLength()
-        );
-        operatorDelegatorArray[0] = operatorDelegator1;
-        operatorDelegatorArray[1] = operatorDelegator2;
-
-        return operatorDelegatorArray[operatorDelegatorIndex % operatorDelegatorArray.length];
-    }
 }

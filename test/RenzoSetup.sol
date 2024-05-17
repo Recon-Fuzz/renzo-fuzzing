@@ -306,4 +306,20 @@ contract RenzoSetup is EigenLayerSetup {
         restakeManager.addCollateralToken(IERC20(address(stETH)));
         restakeManager.addCollateralToken(IERC20(address(cbETH)));
     }
+
+    function _getRandomDepositableToken(uint256 tokenIndex) internal view returns (address) {
+        return lstAddresses[tokenIndex % lstAddresses.length];
+    }
+
+    function _getRandomOperatorDelegator(
+        uint256 operatorDelegatorIndex
+    ) internal view returns (IOperatorDelegator operatorDelegator) {
+        IOperatorDelegator[] memory operatorDelegatorArray = new IOperatorDelegator[](
+            restakeManager.getOperatorDelegatorsLength()
+        );
+        operatorDelegatorArray[0] = operatorDelegator1;
+        operatorDelegatorArray[1] = operatorDelegator2;
+
+        return operatorDelegatorArray[operatorDelegatorIndex % operatorDelegatorArray.length];
+    }
 }
