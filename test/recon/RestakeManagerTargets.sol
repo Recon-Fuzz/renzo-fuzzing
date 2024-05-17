@@ -30,15 +30,11 @@ abstract contract RestakeManagerTargets is BaseTargetFunctions, Properties, Befo
     }
 
     function restakeManager_depositETH() public payable {
-        (bool success, ) = address(restakeManager).call{ value: msg.value }(
-            abi.encodeWithSignature("depositETH()")
-        );
+        restakeManager.depositETH{ value: msg.value }();
     }
 
     function restakeManager_depositETHReferral(uint256 referralId) public payable {
-        (bool success, ) = address(restakeManager).call{ value: msg.value }(
-            abi.encodeWithSignature("depositETH(uint256)", referralId)
-        );
+        restakeManager.depositETH{ value: msg.value }(referralId);
     }
 
     // NOTE: danger, setting TVL limits is probably an action that will be taken by admins infrequently
@@ -80,6 +76,10 @@ abstract contract RestakeManagerTargets is BaseTargetFunctions, Properties, Befo
 
         // the target contract gets minted both of the collateral tokens in setup
         IERC20(collateralToken).transfer(address(depositQueue.withdrawQueue()), bufferToFill);
+    }
+
+    function restakeManager_slash() public {
+        ethPOSDepositMock.slash();
     }
 
     // function restakeManager_emptyBuffer() public {
