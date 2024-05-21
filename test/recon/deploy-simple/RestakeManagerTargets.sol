@@ -4,18 +4,12 @@ pragma solidity ^0.8.0;
 import { BaseTargetFunctions } from "@chimera/BaseTargetFunctions.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { vm } from "@chimera/Hevm.sol";
-import { BeforeAfter } from "./BeforeAfter.sol";
 import { Properties } from "./Properties.sol";
-import { IOperatorDelegator } from "../../contracts/Delegation/IOperatorDelegator.sol";
+import { IOperatorDelegator } from "../../../contracts/Delegation/IOperatorDelegator.sol";
 import { DepositQueueTargets } from "./DepositQueueTargets.sol";
 
 // TODO: include setPrice for aggregator in different contract
-abstract contract RestakeManagerTargets is
-    BaseTargetFunctions,
-    Properties,
-    BeforeAfter,
-    DepositQueueTargets
-{
+abstract contract RestakeManagerTargets is BaseTargetFunctions, Properties, DepositQueueTargets {
     function restakeManager_deposit(uint256 tokenIndex, uint256 amount) public {
         IERC20 collateralToken = IERC20(_getRandomDepositableToken(tokenIndex));
         amount = amount % IERC20(collateralToken).balanceOf(address(this));

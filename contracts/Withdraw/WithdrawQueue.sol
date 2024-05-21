@@ -8,6 +8,8 @@ import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import { console2 } from "forge-std/console2.sol";
+
 contract WithdrawQueue is
     Initializable,
     PausableUpgradeable,
@@ -69,6 +71,7 @@ contract WithdrawQueue is
         uint256 _coolDownPeriod,
         TokenWithdrawBuffer[] calldata _withdrawalBufferTarget
     ) external initializer {
+        console2.log("_withdrawalBufferTarget: ", _withdrawalBufferTarget.length);
         if (
             address(_roleManager) == address(0) ||
             address(_ezETH) == address(0) ||

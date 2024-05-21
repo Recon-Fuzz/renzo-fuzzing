@@ -7,8 +7,8 @@ import { CryticAsserts } from "@chimera/CryticAsserts.sol";
 
 // echidna . --contract CryticTester --config echidna.yaml
 // medusa fuzz
-contract CryticTester is RestakeManagerTargets, RestakeManagerAdminTargets, CryticAsserts {
-    constructor() payable {
-        setup();
-    }
-}
+// contract CryticTester is RestakeManagerTargets, RestakeManagerAdminTargets, CryticAsserts {
+//     constructor() payable {
+//         setup();
+//     }
+// }

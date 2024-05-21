@@ -2,10 +2,10 @@
 pragma solidity ^0.8.0;
 
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { Setup } from "./Setup.sol";
-import { IOperatorDelegator } from "../../contracts/Delegation/IOperatorDelegator.sol";
+import { SetupV2 } from "./SetupV2.sol";
+import { IOperatorDelegator } from "../../../contracts/Delegation/IOperatorDelegator.sol";
 
-abstract contract DepositQueueTargets is Setup {
+abstract contract DepositQueueTargetsV2 is SetupV2 {
     // NOTE: this is a privileged function that's called by an ERC20RewardsAdmin admin to sweep ERC20 rewards tokens into RestakeManager
     function depositQueue_depositTokenRewardsFromProtocol(uint256 tokenIndex) public {
         address tokenToDeposit = _getRandomDepositableToken(tokenIndex);
