@@ -9,7 +9,7 @@ import { IOperatorDelegator } from "../../../contracts/Delegation/IOperatorDeleg
 import { DepositQueueTargets } from "./DepositQueueTargets.sol";
 
 // TODO: include setPrice for aggregator in different contract
-abstract contract RestakeManagerTargets is BaseTargetFunctions, Properties, DepositQueueTargets {
+abstract contract RestakeManagerTargets is BaseTargetFunctions, DepositQueueTargets {
     function restakeManager_deposit(uint256 tokenIndex, uint256 amount) public {
         IERC20 collateralToken = IERC20(_getRandomDepositableToken(tokenIndex));
         amount = amount % IERC20(collateralToken).balanceOf(address(this));
