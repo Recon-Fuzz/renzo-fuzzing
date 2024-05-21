@@ -69,6 +69,7 @@ contract RenzoSetup is EigenLayerSetup {
         roleManager.grantRole(roleManager.ORACLE_ADMIN(), admin);
         roleManager.grantRole(roleManager.RESTAKE_MANAGER_ADMIN(), admin);
         roleManager.grantRole(roleManager.ERC20_REWARD_ADMIN(), admin);
+        roleManager.grantRole(roleManager.DEPOSIT_WITHDRAW_PAUSER(), admin);
 
         // deploy tokens
         ezETHImplementation = new EzEthToken();

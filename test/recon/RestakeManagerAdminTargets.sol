@@ -10,6 +10,7 @@ import { IOperatorDelegator } from "../../contracts/Delegation/IOperatorDelegato
 import { DepositQueueTargets } from "./DepositQueueTargets.sol";
 
 // NOTE: RestakeManagerAdmin is set to the target contract in the setup
+// RestakeManagerAdmin encompasses all admin permissions, not only the ones defined by the RESTAKE_MANAGER_ADMIN role
 abstract contract RestakeManagerAdminTargets is
     BaseTargetFunctions,
     Properties,
@@ -24,6 +25,7 @@ abstract contract RestakeManagerAdminTargets is
         IOperatorDelegator newOperatorDelegator = _getRandomOperatorDelegator(
             operatorDelegatorIndex
         );
+
         restakeManager.addOperatorDelegator(newOperatorDelegator, allocationBasisPoints);
     }
 
@@ -31,6 +33,7 @@ abstract contract RestakeManagerAdminTargets is
         IOperatorDelegator operatorDelegatorToRemove = _getRandomOperatorDelegator(
             operatorDelegatorIndex
         );
+
         restakeManager.removeOperatorDelegator(operatorDelegatorToRemove);
     }
 
@@ -38,18 +41,32 @@ abstract contract RestakeManagerAdminTargets is
         IOperatorDelegator operatorDelegator,
         uint256 allocationBasisPoints
     ) public {
+        IOperatorDelegator operatorDelegatorToRemove = _getRandomOperatorDelegator(
+            operatorDelegatorIndex
+        );
+
         restakeManager.setOperatorDelegatorAllocation(operatorDelegator, allocationBasisPoints);
     }
 
     function restakeManagerAdmin_addCollateralToken(uint256 collateralTokenIndex) public {
         address newCollateralTokenAddress = _getRandomDepositableToken(collateralTokenIndex);
         IERC20 newCollateralToken = IERC20(newCollateralTokenAddress);
+
         restakeManager.addCollateralToken(newCollateralToken);
     }
 
     function restakeManagerAdmin_removeCollateralToken(uint256 collateralTokenIndex) public {
         address collateralTokenAddressToRemove = _getRandomDepositableToken(collateralTokenIndex);
         IERC20 collateralTokenToRemove = IERC20(collateralTokenAddressToRemove);
+
         restakeManager.removeCollateralToken(collateralTokenToRemove);
+    }
+
+    function restakeManagerAdmin_setPaused(bool paused) public {
+        restakeManager.setPaused(paused);
+    }
+
+    function restakeManagerAdmin_setMaxDepositTVL(uint256 maxDeposit) public {
+        restakeManager.setMaxDepositTVL(maxDeposit);
     }
 }
