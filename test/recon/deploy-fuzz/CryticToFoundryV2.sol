@@ -11,5 +11,7 @@ contract CryticToFoundryV2 is Test, RestakeManagerTargetsV2, FoundryAsserts {
         setup();
     }
 
-    function test_target_deployer() public {}
+    function test_target_deployer() public {
+        deployTokenStratOperatorDelegator();
+    }
 }

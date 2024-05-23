@@ -3,10 +3,12 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import { BaseTargetFunctions } from "@chimera/BaseTargetFunctions.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { vm } from "@chimera/Hevm.sol";
+import { console2 } from "forge-std/console2.sol";
 
 import { OperatorDelegator } from "contracts/Delegation/OperatorDelegator.sol";
 import { IOperatorDelegator } from "../../../contracts/Delegation/IOperatorDelegator.sol";
@@ -19,22 +21,25 @@ import { IEigenPodManager } from "../../../contracts/EigenLayer/interfaces/IEige
 import { IStrategyManager } from "../../../contracts/EigenLayer/interfaces/IStrategyManager.sol";
 import { MockERC20 } from "../../mocks/MockERC20.sol";
 import { StrategyBaseTVLLimits } from "eigenlayer/contracts/strategies/StrategyBaseTVLLimits.sol";
-import "../../mocks/MockAggregatorV3.sol";
 import { WithdrawQueue } from "contracts/Withdraw/WithdrawQueue.sol";
 import { WithdrawQueueStorageV1 } from "contracts/Withdraw/WithdrawQueueStorage.sol";
+import "../../mocks/MockAggregatorV3.sol";
 
 // TODO: include setPrice for aggregator in different contract
 abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, DepositQueueTargetsV2 {
+    using Strings for uint256;
+
     bool internal hasDoneADeploy;
     uint8 internal decimals;
     uint256 internal initialMintPerUsers;
-    MockERC20 internal collateralToken1;
-    MockAggregatorV3 internal collateralToken1Oracle;
-    // StrategyBaseTVLLimits[] internal deployedStrategyArray;
-    // strategies deployed
-    IStrategy[] internal deployedStrategyArray;
+    uint256 internal initialBufferTarget = 10_000;
+    MockERC20 internal activeCollateralToken;
+    OperatorDelegator internal activeOperatorDelegator;
 
-    // MockAggregatorV3 internal collateralToken1Oracle;
+    mapping(address => MockAggregatorV3) internal collateralTokenOracles;
+    MockERC20[] internal collateralTokens;
+    IStrategy[] internal deployedStrategies;
+
     bool immutable RECON_USE_SINGLE_DEPLOY = true;
     bool immutable RECON_USE_HARDCODED_DECIMALS = true;
 
@@ -123,10 +128,6 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, DepositQueueTa
         require(!hasDoneADeploy); // This bricks the function for Medusa
         // if hasDoneADeploy, this deploys one token, one strategy, one Operator
 
-        if (RECON_USE_SINGLE_DEPLOY) {
-            hasDoneADeploy = true;
-        }
-
         if (RECON_USE_HARDCODED_DECIMALS) {
             decimals = 18;
         }
@@ -134,32 +135,53 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, DepositQueueTa
         initialMintPerUsers = 1_000_000e18;
 
         // deploy collateral token
-        collateralToken1 = new MockERC20("Collateral Token 1", "CT1", decimals);
-        collateralToken1.mint(address(this), initialMintPerUsers);
-        collateralToken1.approve(address(restakeManager), type(uint256).max);
+        {
+            // concatenate length of token array for token name and symbol
+            string memory tokenNumber = (collateralTokens.length + 1).toString();
+            string memory tokenName = string(abi.encodePacked("Collateral Token ", tokenNumber));
+            string memory tokenSymbol = string(abi.encodePacked("CT", tokenNumber));
+
+            collateralTokens.push(new MockERC20(tokenName, tokenSymbol, decimals));
+            collateralTokens[collateralTokens.length - 1].mint(address(this), initialMintPerUsers);
+            collateralTokens[collateralTokens.length - 1].approve(
+                address(restakeManager),
+                type(uint256).max
+            );
+        }
+
+        uint256 collateralTokenslength = collateralTokens.length;
 
         // deploy collateral token oracle
-        vm.warp(1524785992); // warps to echidna's initial start time
-        collateralToken1Oracle = new MockAggregatorV3(
-            18, // decimals
-            "CT1 price oracle", // description
-            1, // version
-            1e18, // answer
-            block.timestamp, // startedAt
-            block.timestamp // updatedAt
-        );
+        {
+            vm.warp(1524785992); // warps to echidna's initial start time
+            MockERC20 collateralTokenForOracle = collateralTokens[collateralTokenslength - 1];
+            MockAggregatorV3 oracleForCollateralToken = new MockAggregatorV3(
+                18, // decimals
+                "CT1 price oracle", // description
+                1, // version
+                1e18, // answer
+                block.timestamp, // startedAt
+                block.timestamp // updatedAt
+            );
 
-        renzoOracle.setOracleAddress(
-            collateralToken1,
-            AggregatorV3Interface(address(collateralToken1Oracle))
-        );
+            collateralTokenOracles[address(collateralTokenForOracle)] = oracleForCollateralToken;
 
-        lstAddresses.push(address(collateralToken1));
+            renzoOracle.setOracleAddress(
+                collateralTokenForOracle,
+                AggregatorV3Interface(address(oracleForCollateralToken))
+            );
+        }
 
-        // deploy EL strategy for token
-        baseStrategyImplementation = new StrategyBaseTVLLimits(strategyManager);
-        for (uint256 i = 0; i < lstAddresses.length; ++i) {
-            deployedStrategyArray.push(
+        // console2.log(
+        //     "oracle from mapping: ",
+        //     address(collateralTokenOracles[address(collateralTokens[collateralTokenslength - 1])])
+        // );
+
+        {
+            // deploy EigenLayer strategy for token
+            // NOTE: this can be refactored into an function in EigenLayer setup that handles this to keep things properly separated
+            baseStrategyImplementation = new StrategyBaseTVLLimits(strategyManager);
+            deployedStrategies.push(
                 IStrategy(
                     address(
                         StrategyBaseTVLLimits(
@@ -169,9 +191,10 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, DepositQueueTa
                                     address(eigenLayerProxyAdmin),
                                     abi.encodeWithSelector(
                                         StrategyBaseTVLLimits.initialize.selector,
+                                        // NOTE: fuzzing these next two input values could allow better evaluation of possible combinations due to TVL limits
                                         type(uint256).max,
                                         type(uint256).max,
-                                        IERC20(lstAddresses[i]),
+                                        IERC20(collateralTokens[collateralTokenslength - 1]),
                                         eigenLayerPauserReg
                                     )
                                 )
@@ -183,48 +206,101 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, DepositQueueTa
         }
 
         // set the strategy whitelist in strategyManager
-        bool[] memory thirdPartyTransfers = new bool[](deployedStrategyArray.length); // default to allowing third party transfers
-        // Create a memory array with the same length as the storage array
-        IStrategy[] memory strategiesToWhitelist = new IStrategy[](deployedStrategyArray.length);
+        // NOTE: toggling third party transfers could be a good target for fuzzing
+        bool[] memory thirdPartyTransfers = new bool[](deployedStrategies.length); // default to allowing third party transfers
 
-        // Copy elements from the storage array to the memory array
-        for (uint i = 0; i < deployedStrategyArray.length; i++) {
-            strategiesToWhitelist[i] = deployedStrategyArray[i];
-        }
-        strategyManager.addStrategiesToDepositWhitelist(strategiesToWhitelist, thirdPartyTransfers);
+        strategyManager.addStrategiesToDepositWhitelist(deployedStrategies, thirdPartyTransfers);
+        // console2.log(
+        //     "strategy whitelisted for deposit: ",
+        //     strategyManager.strategyIsWhitelistedForDeposit(deployedStrategies[0])
+        // );
 
-        // set collateral token in WithdrawQueue
-        WithdrawQueueStorageV1.TokenWithdrawBuffer[]
-            memory withdrawBuffer = new WithdrawQueueStorageV1.TokenWithdrawBuffer[](
-                lstAddresses.length
+        {
+            // set collateral token in WithdrawQueue
+            WithdrawQueueStorageV1.TokenWithdrawBuffer[]
+                memory withdrawBuffer = new WithdrawQueueStorageV1.TokenWithdrawBuffer[](
+                    collateralTokens.length
+                );
+
+            // create new withdrawBuffer target for collateral token
+            withdrawBuffer[collateralTokenslength - 1] = WithdrawQueueStorageV1.TokenWithdrawBuffer(
+                address(collateralTokens[collateralTokenslength - 1]),
+                initialBufferTarget
             );
-        withdrawBuffer[0] = WithdrawQueueStorageV1.TokenWithdrawBuffer(
-            address(collateralToken1),
-            10_000
-        );
 
-        // initialize the withdrawQueue with collateralToken1 buffer
-        // NOTE: buffers can be added using the updateWithdrawBufferTarget function
+            // initialize the withdrawQueue with new withdrawBuffer
+            withdrawQueue.updateWithdrawBufferTarget(withdrawBuffer);
+            // console2.log(
+            //     "buffer target for collateral asset: ",
+            //     withdrawQueue.withdrawalBufferTarget(address(collateralTokens[0]))
+            // );
+        }
 
-        // deploy OperatorDelegator and set the token for it
-        operatorDelegatorImplementation = new OperatorDelegator();
-        operatorDelegator1 = OperatorDelegator(
-            payable(
-                address(
-                    new TransparentUpgradeableProxy(
-                        address(operatorDelegatorImplementation),
-                        address(renzoProxyAdmin),
-                        ""
+        // Deploy OperatorDelegator and set the token strategy for it
+        {
+            operatorDelegatorImplementation = new OperatorDelegator();
+
+            operatorDelegators.push(
+                OperatorDelegator(
+                    payable(
+                        address(
+                            new TransparentUpgradeableProxy(
+                                address(operatorDelegatorImplementation),
+                                address(renzoProxyAdmin),
+                                abi.encodeWithSelector(
+                                    OperatorDelegator.initialize.selector,
+                                    roleManager,
+                                    IStrategyManager(address(strategyManager)),
+                                    restakeManager,
+                                    IDelegationManager(address(delegation)),
+                                    IEigenPodManager(address(eigenPodManager))
+                                )
+                            )
+                        )
                     )
                 )
-            )
-        );
-        operatorDelegator1.initialize(
-            roleManager,
-            IStrategyManager(address(strategyManager)),
-            restakeManager,
-            IDelegationManager(address(delegation)),
-            IEigenPodManager(address(eigenPodManager))
-        );
+            );
+
+            // console2.log("ODs length: ", operatorDelegators.length);
+        }
+
+        // NOTE: could fuzz operatorDelegatorAllocation for more randomness
+        uint256 operatorDelegatorAllocation = 10_000; // 10,000 BP because only using one active OperatorDelegator at a time
+
+        // Add OperatorDelegator and collateral token to RestakeManager
+        // NOTE: Removes the previously set OperatorDelegator and collateral token so only one is set at a time
+        {
+            // only remove previously set values if not first deployment
+            if (hasDoneADeploy) {
+                // NOTE: this assumes there is only ever one OperatorDelegator in the array, if this isn't true, this logic will be incorrect
+                IOperatorDelegator operatorDelegatorToRemove = restakeManager.operatorDelegators(0);
+                // remove previously set OperatorDelegator
+                restakeManager.removeOperatorDelegator(operatorDelegatorToRemove);
+
+                // remove previously set collateral token
+                IERC20 collateralTokenToRemove = restakeManager.collateralTokens(0);
+                restakeManager.removeCollateralToken(collateralTokenToRemove);
+            }
+
+            // adds most recently deployed OperatorDelegator to RestakeManager
+            restakeManager.addOperatorDelegator(
+                IOperatorDelegator(address(operatorDelegators[operatorDelegators.length - 1])),
+                operatorDelegatorAllocation
+            );
+
+            // adds the most recently deployed collateral token to the restake manager
+            restakeManager.addCollateralToken(
+                IERC20(address(collateralTokens[collateralTokens.length - 1]))
+            );
+
+            // sets the active collateral token and OperatorDelegator for access in tests
+            activeOperatorDelegator = operatorDelegators[operatorDelegators.length - 1];
+            activeCollateralToken = collateralTokens[collateralTokens.length - 1];
+        }
+
+        // NOTE: only set this to true here to not interfere with above logic for removing any exsiting OperatorDelegator + token
+        if (RECON_USE_SINGLE_DEPLOY) {
+            hasDoneADeploy = true;
+        }
     }
 }

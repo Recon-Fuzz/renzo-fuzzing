@@ -37,9 +37,11 @@ contract RenzoSetupV2 is EigenLayerSetupV2 {
     WithdrawQueue internal withdrawQueueImplementation;
     RewardHandler internal rewardHandler;
     RewardHandler internal rewardHandlerImplementation;
-    OperatorDelegator internal operatorDelegator1;
-    OperatorDelegator internal operatorDelegator2;
+    // OperatorDelegator internal operatorDelegator1;
+    // OperatorDelegator internal operatorDelegator2;
+    // OperatorDelegator internal operatorDelegatorImplementation;
     OperatorDelegator internal operatorDelegatorImplementation;
+    OperatorDelegator[] internal operatorDelegators;
 
     address[] internal lstAddresses;
     function deployRenzo(bool eigenLayerLocal) internal {
@@ -65,6 +67,7 @@ contract RenzoSetupV2 is EigenLayerSetupV2 {
         roleManager.grantRole(roleManager.ORACLE_ADMIN(), admin);
         roleManager.grantRole(roleManager.RESTAKE_MANAGER_ADMIN(), admin);
         roleManager.grantRole(roleManager.ERC20_REWARD_ADMIN(), admin);
+        roleManager.grantRole(roleManager.WITHDRAW_QUEUE_ADMIN(), admin);
 
         // deploy tokens
         ezETHImplementation = new EzEthToken();
@@ -267,19 +270,15 @@ contract RenzoSetupV2 is EigenLayerSetupV2 {
         // restakeManager.addCollateralToken(IERC20(address(cbETH)));
     }
 
+    /** Utils **/
     function _getRandomDepositableToken(uint256 tokenIndex) internal view returns (address) {
         return lstAddresses[tokenIndex % lstAddresses.length];
     }
 
+    // TODO: need to refactor this to work with OperatorDelegator array defined in RestakeManagerTargetsV2
     function _getRandomOperatorDelegator(
         uint256 operatorDelegatorIndex
     ) internal view returns (IOperatorDelegator operatorDelegator) {
-        IOperatorDelegator[] memory operatorDelegatorArray = new IOperatorDelegator[](
-            restakeManager.getOperatorDelegatorsLength()
-        );
-        operatorDelegatorArray[0] = operatorDelegator1;
-        operatorDelegatorArray[1] = operatorDelegator2;
-
-        return operatorDelegatorArray[operatorDelegatorIndex % operatorDelegatorArray.length];
+        return operatorDelegators[operatorDelegatorIndex % operatorDelegators.length];
     }
 }
