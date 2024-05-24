@@ -23,10 +23,11 @@ import { MockERC20 } from "../../mocks/MockERC20.sol";
 import { StrategyBaseTVLLimits } from "eigenlayer/contracts/strategies/StrategyBaseTVLLimits.sol";
 import { WithdrawQueue } from "contracts/Withdraw/WithdrawQueue.sol";
 import { WithdrawQueueStorageV1 } from "contracts/Withdraw/WithdrawQueueStorage.sol";
+import { SetupV2 } from "./SetupV2.sol";
 import "../../mocks/MockAggregatorV3.sol";
 
 // TODO: include setPrice for aggregator in different contract
-abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, DepositQueueTargetsV2 {
+abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
     using Strings for uint256;
 
     bool internal hasDoneADeploy;
@@ -35,9 +36,6 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, DepositQueueTa
     uint256 internal initialBufferTarget = 10_000;
     MockERC20 internal activeCollateralToken;
     OperatorDelegator internal activeOperatorDelegator;
-
-    mapping(address => MockAggregatorV3) internal collateralTokenOracles;
-    MockERC20[] internal collateralTokens;
     IStrategy[] internal deployedStrategies;
 
     bool immutable RECON_USE_SINGLE_DEPLOY = true;
@@ -76,22 +74,6 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, DepositQueueTa
         address tokenToLimit = _getRandomDepositableToken(tokenIndex);
 
         restakeManager.setTokenTvlLimit(IERC20(tokenToLimit), amount);
-    }
-
-    // NOTE: this is a privileged function that's called by the DepositQueue to sweep ERC20 rewards tokens into RestakeManager
-    function restakeManager_depositTokenRewardsFromProtocol(uint256 tokenIndex) public {
-        depositQueue_depositTokenRewardsFromProtocol(tokenIndex);
-    }
-
-    // NOTE: this needs to be included to complete the native ETH staking process
-    // @audit currently ETH deposit contract is being mocked by ETHPOSDepositMock so signature values are irrelevant
-    function restakeManager_stakeEthFromQueue(
-        uint256 operatorDelegatorIndex,
-        bytes memory pubkey,
-        bytes memory signature,
-        bytes32 depositDataRoot
-    ) public {
-        depositQueue_stakeEthFromQueue(operatorDelegatorIndex, pubkey, signature, depositDataRoot);
     }
 
     // NOTE: danger, this allows the fuzzer to fill the buffer but may have unintended side-effects for overall system behavior
@@ -177,10 +159,12 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, DepositQueueTa
         //     address(collateralTokenOracles[address(collateralTokens[collateralTokenslength - 1])])
         // );
 
+        // deploy EigenLayer strategy for token
         {
-            // deploy EigenLayer strategy for token
             // NOTE: this can be refactored into an function in EigenLayer setup that handles this to keep things properly separated
             baseStrategyImplementation = new StrategyBaseTVLLimits(strategyManager);
+
+            // IStrategy[] memory deployedStrategiesTemp = new IStrategy[](collateralTokenslength);
             deployedStrategies.push(
                 IStrategy(
                     address(

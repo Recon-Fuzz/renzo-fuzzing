@@ -37,13 +37,12 @@ contract RenzoSetupV2 is EigenLayerSetupV2 {
     WithdrawQueue internal withdrawQueueImplementation;
     RewardHandler internal rewardHandler;
     RewardHandler internal rewardHandlerImplementation;
-    // OperatorDelegator internal operatorDelegator1;
-    // OperatorDelegator internal operatorDelegator2;
-    // OperatorDelegator internal operatorDelegatorImplementation;
     OperatorDelegator internal operatorDelegatorImplementation;
     OperatorDelegator[] internal operatorDelegators;
+    MockERC20[] internal collateralTokens;
 
-    address[] internal lstAddresses;
+    mapping(address => MockAggregatorV3) internal collateralTokenOracles;
+
     function deployRenzo(bool eigenLayerLocal) internal {
         renzoProxyAdmin = new ProxyAdmin();
 
@@ -195,84 +194,11 @@ contract RenzoSetupV2 is EigenLayerSetupV2 {
             )
         );
         rewardHandler.initialize(roleManager, address(depositQueue));
-
-        // NOTE: all of the logic below will be shifted to helper functions in RestakeManager targets
-        // deploy OperatorDelegators
-        // operatorDelegatorImplementation = new OperatorDelegator();
-        // operatorDelegator1 = OperatorDelegator(
-        //     payable(
-        //         address(
-        //             new TransparentUpgradeableProxy(
-        //                 address(operatorDelegatorImplementation),
-        //                 address(renzoProxyAdmin),
-        //                 ""
-        //             )
-        //         )
-        //     )
-        // );
-        // operatorDelegator1.initialize(
-        //     roleManager,
-        //     IStrategyManager(address(strategyManager)),
-        //     restakeManager,
-        //     IDelegationManager(address(delegation)),
-        //     IEigenPodManager(address(eigenPodManager))
-        // );
-
-        // operatorDelegator2 = OperatorDelegator(
-        //     payable(
-        //         address(
-        //             new TransparentUpgradeableProxy(
-        //                 address(operatorDelegatorImplementation),
-        //                 address(renzoProxyAdmin),
-        //                 ""
-        //             )
-        //         )
-        //     )
-        // );
-        // operatorDelegator2.initialize(
-        //     roleManager,
-        //     IStrategyManager(address(strategyManager)),
-        //     restakeManager,
-        //     IDelegationManager(address(delegation)),
-        //     IEigenPodManager(address(eigenPodManager))
-        // );
-
-        // set token strategies on OperatorDelegators
-        // operatorDelegator1.setTokenStrategy(
-        //     IERC20(address(stETH)),
-        //     IStrategy(address(deployedStrategyArray[0]))
-        // );
-        // operatorDelegator1.setTokenStrategy(
-        //     IERC20(address(cbETH)),
-        //     IStrategy(address(deployedStrategyArray[1]))
-        // );
-        // operatorDelegator2.setTokenStrategy(
-        //     IERC20(address(stETH)),
-        //     IStrategy(address(deployedStrategyArray[0]))
-        // );
-        // operatorDelegator2.setTokenStrategy(
-        //     IERC20(address(cbETH)),
-        //     IStrategy(address(deployedStrategyArray[1]))
-        // );
-
-        // // add operator delegators to RestakeManager
-        // restakeManager.addOperatorDelegator(
-        //     IOperatorDelegator(address(operatorDelegator1)),
-        //     7000 // 70% to operator 1
-        // );
-        // restakeManager.addOperatorDelegator(
-        //     IOperatorDelegator(address(operatorDelegator2)),
-        //     3000 // 30% to operator 2
-        // );
-
-        // // add the collateral tokens to the restake manager
-        // restakeManager.addCollateralToken(IERC20(address(stETH)));
-        // restakeManager.addCollateralToken(IERC20(address(cbETH)));
     }
 
     /** Utils **/
     function _getRandomDepositableToken(uint256 tokenIndex) internal view returns (address) {
-        return lstAddresses[tokenIndex % lstAddresses.length];
+        return address(collateralTokens[tokenIndex % collateralTokens.length]);
     }
 
     // TODO: need to refactor this to work with OperatorDelegator array defined in RestakeManagerTargetsV2
