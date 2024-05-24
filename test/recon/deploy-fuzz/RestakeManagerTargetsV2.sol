@@ -105,10 +105,14 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
     }
 
     // NOTE: can add extra source of randomness by fuzzing the allocation parameters for OperatorDelegator
-    function deployTokenStratOperatorDelegator() public {
+    function restakeManager_deployTokenStratOperatorDelegator() public {
         // NOTE: TEMPORARY
         require(!hasDoneADeploy); // This bricks the function for Medusa
         // if hasDoneADeploy, this deploys one token, one strategy, one Operator
+
+        if (RECON_USE_SINGLE_DEPLOY) {
+            hasDoneADeploy = true;
+        }
 
         if (RECON_USE_HARDCODED_DECIMALS) {
             decimals = 18;
@@ -247,44 +251,41 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
 
             // console2.log("ODs length: ", operatorDelegators.length);
         }
+    }
 
+    function restakeManager_switchTokenAndDelegator(
+        uint256 operatorDelegatorIndex,
+        uint256 collateralTokenIndex
+    ) public {
         // NOTE: could fuzz operatorDelegatorAllocation for more randomness
-        uint256 operatorDelegatorAllocation = 10_000; // 10,000 BP because only using one active OperatorDelegator at a time
+        uint256 operatorDelegatorAllocation = 10_000; // 10,000 BP becauseonly using one active OperatorDelegator at a time
 
         // Add OperatorDelegator and collateral token to RestakeManager
         // NOTE: Removes the previously set OperatorDelegator and collateral token so only one is set at a time
-        {
-            // only remove previously set values if not first deployment
-            if (hasDoneADeploy) {
-                // NOTE: this assumes there is only ever one OperatorDelegator in the array, if this isn't true, this logic will be incorrect
-                IOperatorDelegator operatorDelegatorToRemove = restakeManager.operatorDelegators(0);
-                // remove previously set OperatorDelegator
-                restakeManager.removeOperatorDelegator(operatorDelegatorToRemove);
 
-                // remove previously set collateral token
-                IERC20 collateralTokenToRemove = restakeManager.collateralTokens(0);
-                restakeManager.removeCollateralToken(collateralTokenToRemove);
-            }
-
-            // adds most recently deployed OperatorDelegator to RestakeManager
-            restakeManager.addOperatorDelegator(
-                IOperatorDelegator(address(operatorDelegators[operatorDelegators.length - 1])),
-                operatorDelegatorAllocation
-            );
-
-            // adds the most recently deployed collateral token to the restake manager
-            restakeManager.addCollateralToken(
-                IERC20(address(collateralTokens[collateralTokens.length - 1]))
-            );
-
-            // sets the active collateral token and OperatorDelegator for access in tests
-            activeOperatorDelegator = operatorDelegators[operatorDelegators.length - 1];
-            activeCollateralToken = collateralTokens[collateralTokens.length - 1];
+        // only remove previously set values if not first deployment
+        if (hasDoneADeploy) {
+            // NOTE: this assumes there is only ever one OperatorDelegator in the array, if this isn't true, this logic will be incorrect
+            IOperatorDelegator operatorDelegatorToRemove = restakeManager.operatorDelegators(0);
+            // remove previously set OperatorDelegator
+            restakeManager.removeOperatorDelegator(operatorDelegatorToRemove);
+            // remove previously set collateral token
+            IERC20 collateralTokenToRemove = restakeManager.collateralTokens(0);
+            restakeManager.removeCollateralToken(collateralTokenToRemove);
         }
 
-        // NOTE: only set this to true here to not interfere with above logic for removing any exsiting OperatorDelegator + token
-        if (RECON_USE_SINGLE_DEPLOY) {
-            hasDoneADeploy = true;
-        }
+        // adds random OperatorDelegator to RestakeManager
+        IOperatorDelegator operatorDelegatorToAdd = _getRandomOperatorDelegator(
+            operatorDelegatorIndex
+        );
+        restakeManager.addOperatorDelegator(operatorDelegatorToAdd, operatorDelegatorAllocation);
+
+        // adds random collateral token to the restake manager
+        address collateralTokenToAdd = _getRandomDepositableToken(collateralTokenIndex);
+        restakeManager.addCollateralToken(IERC20(collateralTokenToAdd));
+
+        // sets the currently active collateral token and OperatorDelegator for access in tests
+        activeOperatorDelegator = OperatorDelegator(payable(address(operatorDelegatorToAdd)));
+        activeCollateralToken = MockERC20(collateralTokenToAdd);
     }
 }
