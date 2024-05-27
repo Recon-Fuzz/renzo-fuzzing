@@ -30,6 +30,7 @@ import "../../mocks/MockAggregatorV3.sol";
 abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
     using Strings for uint256;
 
+    bool internal singleDeployed;
     bool internal hasDoneADeploy;
     uint8 internal decimals;
     uint256 internal initialMintPerUsers;
@@ -38,7 +39,9 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
     OperatorDelegator internal activeOperatorDelegator;
     IStrategy[] internal deployedStrategies;
 
-    bool immutable RECON_USE_SINGLE_DEPLOY = true;
+    // bool immutable RECON_USE_SINGLE_DEPLOY = true;
+    // @audit setting this to false see if multiple deploy works
+    bool immutable RECON_USE_SINGLE_DEPLOY = false;
     bool immutable RECON_USE_HARDCODED_DECIMALS = true;
 
     function restakeManager_deposit(uint256 tokenIndex, uint256 amount) public {
@@ -107,11 +110,11 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
     // NOTE: can add extra source of randomness by fuzzing the allocation parameters for OperatorDelegator
     function restakeManager_deployTokenStratOperatorDelegator() public {
         // NOTE: TEMPORARY
-        require(!hasDoneADeploy); // This bricks the function for Medusa
-        // if hasDoneADeploy, this deploys one token, one strategy, one Operator
+        require(!singleDeployed); // This bricks the function for Medusa
+        // if singleDeployed, this deploys one token, one strategy, one Operator
 
         if (RECON_USE_SINGLE_DEPLOY) {
-            hasDoneADeploy = true;
+            singleDeployed = true;
         }
 
         if (RECON_USE_HARDCODED_DECIMALS) {
@@ -203,15 +206,14 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
         //     strategyManager.strategyIsWhitelistedForDeposit(deployedStrategies[0])
         // );
 
+        // NOTE: this logic might make more sense to have in switcher because the token shouldn't be added to the renzo system here
+        // set collateral token in WithdrawQueue
         {
-            // set collateral token in WithdrawQueue
+            // withdrawBuffer only needs length 1 because updating single asset and target in each deploy
             WithdrawQueueStorageV1.TokenWithdrawBuffer[]
-                memory withdrawBuffer = new WithdrawQueueStorageV1.TokenWithdrawBuffer[](
-                    collateralTokens.length
-                );
+                memory withdrawBuffer = new WithdrawQueueStorageV1.TokenWithdrawBuffer[](1);
 
-            // create new withdrawBuffer target for collateral token
-            withdrawBuffer[collateralTokenslength - 1] = WithdrawQueueStorageV1.TokenWithdrawBuffer(
+            withdrawBuffer[0] = WithdrawQueueStorageV1.TokenWithdrawBuffer(
                 address(collateralTokens[collateralTokenslength - 1]),
                 initialBufferTarget
             );
@@ -251,6 +253,12 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
 
             // console2.log("ODs length: ", operatorDelegators.length);
         }
+
+        // If this is the first deploy, use the switcher to set OperatorDelegator and CollateralToken
+        if (!hasDoneADeploy) {
+            restakeManager_switchTokenAndDelegator(0, 0);
+            hasDoneADeploy = true;
+        }
     }
 
     function restakeManager_switchTokenAndDelegator(
@@ -261,10 +269,12 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
         uint256 operatorDelegatorAllocation = 10_000; // 10,000 BP becauseonly using one active OperatorDelegator at a time
 
         // Add OperatorDelegator and collateral token to RestakeManager
-        // NOTE: Removes the previously set OperatorDelegator and collateral token so only one is set at a time
-
-        // only remove previously set values if not first deployment
-        if (hasDoneADeploy) {
+        // NOTE: only remove existing OperatorDelegator and CollateralToken if they've been previously set (not first deployment)
+        if (
+            restakeManager.getOperatorDelegatorsLength() != 0 &&
+            restakeManager.getCollateralTokensLength() != 0
+        ) {
+            console2.log("values get switched");
             // NOTE: this assumes there is only ever one OperatorDelegator in the array, if this isn't true, this logic will be incorrect
             IOperatorDelegator operatorDelegatorToRemove = restakeManager.operatorDelegators(0);
             // remove previously set OperatorDelegator
