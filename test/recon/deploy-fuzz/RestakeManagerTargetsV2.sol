@@ -13,7 +13,7 @@ import { console2 } from "forge-std/console2.sol";
 import { OperatorDelegator } from "contracts/Delegation/OperatorDelegator.sol";
 import { IOperatorDelegator } from "../../../contracts/Delegation/IOperatorDelegator.sol";
 import { DepositQueueTargetsV2 } from "./DepositQueueTargetsV2.sol";
-import { IStrategy } from "eigenlayer/contracts/interfaces/IStrategy.sol";
+import { IStrategy } from "contracts/EigenLayer/interfaces/IStrategy.sol";
 import {
     IDelegationManager
 } from "../../../contracts/EigenLayer/interfaces/IDelegationManager.sol";
@@ -171,7 +171,6 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
             // NOTE: this can be refactored into an function in EigenLayer setup that handles this to keep things properly separated
             baseStrategyImplementation = new StrategyBaseTVLLimits(strategyManager);
 
-            // IStrategy[] memory deployedStrategiesTemp = new IStrategy[](collateralTokenslength);
             deployedStrategies.push(
                 IStrategy(
                     address(
@@ -198,13 +197,16 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
 
         // set the strategy whitelist in strategyManager
         // NOTE: toggling third party transfers could be a good target for fuzzing
-        bool[] memory thirdPartyTransfers = new bool[](deployedStrategies.length); // default to allowing third party transfers
 
-        strategyManager.addStrategiesToDepositWhitelist(deployedStrategies, thirdPartyTransfers);
-        // console2.log(
-        //     "strategy whitelisted for deposit: ",
-        //     strategyManager.strategyIsWhitelistedForDeposit(deployedStrategies[0])
-        // );
+        // only need to add one strategy at a time
+        bool[] memory thirdPartyTransfers = new bool[](1); // default to allowing third party transfers
+        address[] memory deployedStrategiesTemp = new address[](1);
+
+        // adds the most recently deployed strategy to the array that is used to set strategies in StrategyManager
+        deployedStrategiesTemp[0] = address(deployedStrategies[deployedStrategies.length - 1]);
+        _addStrategiesToDepositWhitelist(deployedStrategiesTemp, thirdPartyTransfers);
+
+        IStrategy addedStrategy = deployedStrategies[deployedStrategies.length - 1];
 
         // NOTE: this logic might make more sense to have in switcher because the token shouldn't be added to the renzo system here
         // set collateral token in WithdrawQueue
@@ -263,10 +265,11 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
 
     function restakeManager_switchTokenAndDelegator(
         uint256 operatorDelegatorIndex,
-        uint256 collateralTokenIndex
+        // uint256 collateralTokenIndex
+        uint256 tokenStrategyIndex
     ) public {
         // NOTE: could fuzz operatorDelegatorAllocation for more randomness
-        uint256 operatorDelegatorAllocation = 10_000; // 10,000 BP becauseonly using one active OperatorDelegator at a time
+        uint256 operatorDelegatorAllocation = 10_000; // 10,000 BP because only using one active OperatorDelegator at a time
 
         // Add OperatorDelegator and collateral token to RestakeManager
         // NOTE: only remove existing OperatorDelegator and CollateralToken if they've been previously set (not first deployment)
@@ -274,7 +277,6 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
             restakeManager.getOperatorDelegatorsLength() != 0 &&
             restakeManager.getCollateralTokensLength() != 0
         ) {
-            console2.log("values get switched");
             // NOTE: this assumes there is only ever one OperatorDelegator in the array, if this isn't true, this logic will be incorrect
             IOperatorDelegator operatorDelegatorToRemove = restakeManager.operatorDelegators(0);
             // remove previously set OperatorDelegator
@@ -290,12 +292,22 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
         );
         restakeManager.addOperatorDelegator(operatorDelegatorToAdd, operatorDelegatorAllocation);
 
+        // fetches random token strategy and corresponding collateralToken
+        IStrategy strategyToAdd = _getRandomTokenStrategy(tokenStrategyIndex);
+        IERC20 collateralTokenToAdd = strategyToAdd.underlyingToken();
+
         // adds random collateral token to the restake manager
-        address collateralTokenToAdd = _getRandomDepositableToken(collateralTokenIndex);
-        restakeManager.addCollateralToken(IERC20(collateralTokenToAdd));
+        restakeManager.addCollateralToken(collateralTokenToAdd);
 
         // sets the currently active collateral token and OperatorDelegator for access in tests
         activeOperatorDelegator = OperatorDelegator(payable(address(operatorDelegatorToAdd)));
-        activeCollateralToken = MockERC20(collateralTokenToAdd);
+        activeCollateralToken = MockERC20(address(collateralTokenToAdd));
+
+        // set token strategy in the OperatorDelegator
+        activeOperatorDelegator.setTokenStrategy(collateralTokenToAdd, strategyToAdd);
+    }
+
+    function _getRandomTokenStrategy(uint256 strategyIndex) internal returns (IStrategy strategy) {
+        return deployedStrategies[strategyIndex % deployedStrategies.length];
     }
 }
