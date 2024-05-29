@@ -11,26 +11,6 @@ import { IOperatorDelegator } from "../../../contracts/Delegation/IOperatorDeleg
 // NOTE: RestakeManagerAdmin is set to the target contract in the setup
 // RestakeManagerAdmin encompasses all admin permissions, not only the ones defined by the RESTAKE_MANAGER_ADMIN role
 abstract contract RestakeManagerAdminTargetsV2 is BaseTargetFunctions, SetupV2 {
-    // function restakeManagerAdmin_addOperatorDelegator(
-    //     uint256 operatorDelegatorIndex,
-    //     uint256 allocationBasisPoints
-    // ) public {
-    //     // TODO: need to fetch one of the valid OperatorDelegators
-    //     IOperatorDelegator newOperatorDelegator = _getRandomOperatorDelegator(
-    //         operatorDelegatorIndex
-    //     );
-
-    //     restakeManager.addOperatorDelegator(newOperatorDelegator, allocationBasisPoints);
-    // }
-
-    // function restakeManagerAdmin_removeOperatorDelegator(uint256 operatorDelegatorIndex) public {
-    //     IOperatorDelegator operatorDelegatorToRemove = _getRandomOperatorDelegator(
-    //         operatorDelegatorIndex
-    //     );
-
-    //     restakeManager.removeOperatorDelegator(operatorDelegatorToRemove);
-    // }
-
     function restakeManagerAdmin_setOperatorDelegatorAllocation(
         uint256 operatorDelegatorIndex,
         uint256 allocationBasisPoints
@@ -44,20 +24,6 @@ abstract contract RestakeManagerAdminTargetsV2 is BaseTargetFunctions, SetupV2 {
             allocationBasisPoints
         );
     }
-
-    // function restakeManagerAdmin_addCollateralToken(uint256 collateralTokenIndex) public {
-    //     address newCollateralTokenAddress = _getRandomDepositableToken(collateralTokenIndex);
-    //     IERC20 newCollateralToken = IERC20(newCollateralTokenAddress);
-
-    //     restakeManager.addCollateralToken(newCollateralToken);
-    // }
-
-    // function restakeManagerAdmin_removeCollateralToken(uint256 collateralTokenIndex) public {
-    //     address collateralTokenAddressToRemove = _getRandomDepositableToken(collateralTokenIndex);
-    //     IERC20 collateralTokenToRemove = IERC20(collateralTokenAddressToRemove);
-
-    //     restakeManager.removeCollateralToken(collateralTokenToRemove);
-    // }
 
     function restakeManagerAdmin_setPaused(bool paused) public {
         restakeManager.setPaused(paused);
