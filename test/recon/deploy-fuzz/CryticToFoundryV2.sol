@@ -4,9 +4,15 @@ pragma solidity ^0.8.0;
 import { Test } from "forge-std/Test.sol";
 import { console2 } from "forge-std/console2.sol";
 import { RestakeManagerTargetsV2 } from "./RestakeManagerTargetsV2.sol";
+import { RestakeManagerAdminTargetsV2 } from "./RestakeManagerAdminTargetsV2.sol";
 import { FoundryAsserts } from "@chimera/FoundryAsserts.sol";
 
-contract CryticToFoundryV2 is Test, RestakeManagerTargetsV2, FoundryAsserts {
+contract CryticToFoundryV2 is
+    Test,
+    RestakeManagerTargetsV2,
+    RestakeManagerAdminTargetsV2,
+    FoundryAsserts
+{
     function setUp() public {
         setup();
     }
@@ -55,6 +61,7 @@ contract CryticToFoundryV2 is Test, RestakeManagerTargetsV2, FoundryAsserts {
     }
 
     // only calling deploy then set should switch the values
+    // NOTE: run this again to ensure it works for multiple strategies
     function test_deploy_and_set_multi() public {
         // deploy first combo
         restakeManager_deployTokenStratOperatorDelegator();
@@ -70,5 +77,23 @@ contract CryticToFoundryV2 is Test, RestakeManagerTargetsV2, FoundryAsserts {
 
         console2.log("active operatorDelegator: ", address(restakeManager.operatorDelegators(0)));
         console2.log("active collateralToken: ", address(restakeManager.collateralTokens(0)));
+    }
+
+    // @audit this demonstrates a real issue where if _amount <= bufferToFill in call to RestakeManager::deposit it reverts
+    // can define a property for this where if user bal >= _amount, deposit should never revert
+    function test_deploy_and_deposit_issue1() public {
+        restakeManager_deployTokenStratOperatorDelegator();
+
+        restakeManager_deposit(0, 50);
+    }
+
+    function test_deploy_and_deposit() public {
+        restakeManager_deployTokenStratOperatorDelegator();
+
+        restakeManager_deposit(0, 10_500);
+    }
+
+    function test_setPaused() public {
+        restakeManagerAdmin_setPaused(true);
     }
 }
