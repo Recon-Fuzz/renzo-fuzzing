@@ -1,3 +1,6 @@
+# Ignore any changes to contracts
+contracts/
+
 # Logs
 logs
 *.log
