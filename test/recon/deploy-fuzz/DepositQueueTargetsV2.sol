@@ -4,6 +4,8 @@ pragma solidity ^0.8.0;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SetupV2 } from "./SetupV2.sol";
 import { IOperatorDelegator } from "../../../contracts/Delegation/IOperatorDelegator.sol";
+import { vm } from "@chimera/Hevm.sol";
+import { console2 } from "forge-std/console2.sol";
 
 abstract contract DepositQueueTargetsV2 is SetupV2 {
     // NOTE: this is a privileged function that's called by an ERC20RewardsAdmin admin to sweep ERC20 rewards tokens into RestakeManager
@@ -24,6 +26,21 @@ abstract contract DepositQueueTargetsV2 is SetupV2 {
     ) public {
         IOperatorDelegator operatorDelegator = _getRandomOperatorDelegator(operatorDelegatorIndex);
 
+        // this creates a validator deployed via an EigenPod once the DepositQueue has at least 32 ETH in it
         depositQueue.stakeEthFromQueue(operatorDelegator, pubkey, signature, depositDataRoot);
+        console2.log("operator delegator address: ", address(operatorDelegator));
+
+        // update shares of the OperatorDelegator (EigenPod owner) to simulate a validation of a beacon chain state proof of the validator balance
+        // NOTE: shares of EigenPod are exchangeable 1:1 with the ETH staked in the validator node
+        address podAddress = address(eigenPodManager.getPod(address(operatorDelegator)));
+        // need to prank as the pod to be able ot update share accounting
+        vm.prank(podAddress);
+        eigenPodManager.recordBeaconChainETHBalanceUpdate(address(operatorDelegator), 32 ether);
+
+        // verifying pod owner shares accounting
+        console2.log(
+            "pod owner shares before: ",
+            eigenPodManager.podOwnerShares(address(operatorDelegator))
+        );
     }
 }

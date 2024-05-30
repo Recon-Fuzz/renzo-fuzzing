@@ -103,9 +103,63 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
         IERC20(collateralToken).transfer(address(depositQueue), amount);
     }
 
-    function restakeManager_slash() public {
+    // @notice simulates a native slashing event on one of the validators that gets created by OperatorDelegator::stakeEth
+    function restakeManager_slash_native(uint256 operatorDelegatorIndex) public {
+        // OperatorDelegators are what make the call to deploy EigenPod and so are the owner of the created pod
+        IOperatorDelegator operatorDelegator = _getRandomOperatorDelegator(operatorDelegatorIndex);
+
+        uint256 podOwnerSharesBefore = eigenPodManager.podOwnerShares(address(operatorDelegator));
+
+        // reduces the balance of the deposit contract by the max slashing penalty (1 ETH)
         ethPOSDepositMock.slash();
+
+        // update the staker's balance in EL by calling EigenPodManager as the pod
+        address podAddress = address(eigenPodManager.getPod(address(operatorDelegator)));
+        vm.prank(podAddress);
+        eigenPodManager.recordBeaconChainETHBalanceUpdate(address(operatorDelegator), -1 ether);
+
+        uint256 podOwnerSharesAfter = eigenPodManager.podOwnerShares(address(operatorDelegator));
+
+        // check that share allocation is properly decreased
+        require(podOwnerSharesAfter < podOwnerSharesBefore, "pod owner shares don't decrease");
     }
+
+    // Slasher interface implies that Staker's accounting is updated as well as part of their stake being lost in recordStakeUpdate
+    // AVS slashing is likely to be a percentage of funds held by the OperatorDelegator instead of a fixed amount like for native
+    // NOTE:For EigenLayer, the ETH held in depositQueue is irrelevant, because it doesn't represent a stake in EigenLayer
+    //      so slashing only effects the amount actually deposited by an OperatorDelegator
+
+    // The following are the only cases that the EigenLayer system would have an effect on balances via slashing:
+    // Native ETH: OperatorDelegator has created a validator with the staked ETH (at least 32 ETH deposited)
+    // LSTs: OperatorDelegator has received deposits greater than the withdrawQueue buffer amount
+    // function restakeManager_slash_AVS() public {
+    //     IOperatorDelegator operatorDelegator = _getRandomOperatorDelegator(operatorDelegatorIndex);
+
+    //     // precondition that checks whether ETH has actually been staked in a validator (native) or deposited (LST)
+
+    //     // NOTE: assuming a 3% slashing of OperatorDelegator's entire holdings, similar to the 1/32 ETH for native slashing
+    //     //       but this means that if a OperatorDelegator has multiple validators, they would each experience a 3% reduction
+
+    //     // NOTE: because current deployment setup only sets one collateral token for a given OperatorDelegator this is a binary decision here,
+    //     //       but if an OperatorDelegator has multiple strategies associated with it, this logic will have to be refactored to appropriately slash each
+
+    //     // Native ETH slashing
+    //     // check if the weth strategy is in the OperatorDelegator's strategy list
+    //     // this reverts if the strategy isn't in the list so needs to be caught
+    //     try operatorDelegator.getStrategyIndex(wethStrategy) {
+    //         // if it returns a value, weth is in the strategy list, need to do a native ETH slashing
+
+    //     } catch {
+    //         // if it reverts, operatorDelegator is using an LST strategy
+
+    //         // burn tokens in strategy to ensure they don't effect accounting
+    //         vm.prank(strat);
+
+    //         // remove shares to update operatorDelegator's accounting
+    //         vm.prank(delegationManager);
+    //         strategyManager.removeShares()
+    //     }
+    // }
 
     // NOTE: can add extra source of randomness by fuzzing the allocation parameters for OperatorDelegator
     function restakeManager_deployTokenStratOperatorDelegator() public {
