@@ -100,11 +100,12 @@ contract CryticToFoundryV2 is
     }
 
     function test_native_slashing() public {
+        // need to deploy the system first
+        restakeManager_deployTokenStratOperatorDelegator();
+
         /**
             Setting up validator 
         */
-        // need to deploy the system first
-        restakeManager_deployTokenStratOperatorDelegator();
 
         // user makes a deposit sufficient for creating a new validator
         // NOTE: need to call the RestakeManager contract here directly because RestakeManagerTargets is abstract so can't have value passed to it
@@ -126,6 +127,31 @@ contract CryticToFoundryV2 is
         restakeManager_slash_native(0);
 
         // slashing event reduces the balance associated with the validator in EL
+    }
+
+    function test_avs_slashing() public {
+        // DEPLOY
+        // need to deploy the system first
+        restakeManager_deployTokenStratOperatorDelegator();
+
+        // DEPOSIT
+        // make a deposit into the system with LST
+        restakeManager_deposit(0, 100_000);
+
+        // make a deposit into system with ETH
+        restakeManager.depositETH{ value: 32 ether }();
+
+        // DepositQueue calls stakeEthInOperatorDelegator to create a new validator for OperatorDelegator at index 0
+        // NOTE: passing in random values here because mock deposit contract doesn't actually check these
+        bytes memory pubkey = hex"123456";
+        bytes memory signature = hex"789101";
+        bytes32 dataRoot = bytes32(uint256(0xbeef));
+
+        // NOTE: the OperatorDelegator is the owner of the created EigenPod
+        depositQueue_stakeEthFromQueue(0, pubkey, signature, dataRoot);
+
+        // SLASH
+        restakeManager_slash_AVS();
     }
 
     // NOTE: this is needed for handling gas refunds from call to stakeEthFromQueue

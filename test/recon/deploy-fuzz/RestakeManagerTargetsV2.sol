@@ -37,12 +37,14 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
     uint256 internal initialBufferTarget = 10_000;
     MockERC20 internal activeCollateralToken;
     OperatorDelegator internal activeOperatorDelegator;
+    IStrategy internal activeStrategy;
     IStrategy[] internal deployedStrategies;
 
     // bool immutable RECON_USE_SINGLE_DEPLOY = true;
     // @audit setting this to false see if multiple deploy works
     bool immutable RECON_USE_SINGLE_DEPLOY = false;
     bool immutable RECON_USE_HARDCODED_DECIMALS = true;
+    address immutable TOKEN_BURN_ADDRESS = address(0x1);
 
     function restakeManager_deposit(uint256 tokenIndex, uint256 amount) public {
         IERC20 collateralToken = IERC20(_getRandomDepositableToken(tokenIndex));
@@ -111,9 +113,9 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
         int256 podOwnerSharesBefore = eigenPodManager.podOwnerShares(address(operatorDelegator));
 
         // reduces the balance of the deposit contract by the max slashing penalty (1 ETH)
-        ethPOSDepositMock.slash();
+        ethPOSDepositMock.slash(1 ether);
 
-        // update the staker's balance in EL by calling EigenPodManager as the pod
+        // update the OperatorDelegator's share balance in EL by calling EigenPodManager as the pod
         address podAddress = address(eigenPodManager.getPod(address(operatorDelegator)));
         vm.prank(podAddress);
         eigenPodManager.recordBeaconChainETHBalanceUpdate(address(operatorDelegator), -1 ether);
@@ -132,34 +134,68 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
     // The following are the only cases that the EigenLayer system would have an effect on balances via slashing:
     // Native ETH: OperatorDelegator has created a validator with the staked ETH (at least 32 ETH deposited)
     // LSTs: OperatorDelegator has received deposits greater than the withdrawQueue buffer amount
-    // function restakeManager_slash_AVS() public {
-    //     IOperatorDelegator operatorDelegator = _getRandomOperatorDelegator(operatorDelegatorIndex);
+    function restakeManager_slash_AVS() public {
+        uint256 slashingPercentInBps = 300;
+        // precondition that checks whether ETH has actually been staked in a validator (native) or deposited (LST)
 
-    //     // precondition that checks whether ETH has actually been staked in a validator (native) or deposited (LST)
+        // NOTE: assuming a 3% slashing of OperatorDelegator's entire holdings, similar to the 1/32 ETH for native slashing
+        //       but this means that if a OperatorDelegator has multiple validators, they would each experience a 3% reduction
 
-    //     // NOTE: assuming a 3% slashing of OperatorDelegator's entire holdings, similar to the 1/32 ETH for native slashing
-    //     //       but this means that if a OperatorDelegator has multiple validators, they would each experience a 3% reduction
+        // NOTE: because current deployment setup only sets one collateral token for a given OperatorDelegator there are only two possible stakes that can be slashed (LST and native ETH),
+        //       but if an OperatorDelegator has multiple strategies associated with it, this logic will have to be refactored to appropriately slash each
 
-    //     // NOTE: because current deployment setup only sets one collateral token for a given OperatorDelegator this is a binary decision here,
-    //     //       but if an OperatorDelegator has multiple strategies associated with it, this logic will have to be refactored to appropriately slash each
+        // NOTE: Any OperatorDelegator has two possible stakes in EL, the LSTs in its strategy list and native ETH
+        //       the slashings conducted are dependant on the shares the OperatorDelegator has in each
+        uint256 nativeEthShares = uint256(
+            eigenPodManager.podOwnerShares(address(activeOperatorDelegator))
+        );
+        uint256 lstShares = activeStrategy.shares(address(activeOperatorDelegator));
 
-    //     // Native ETH slashing
-    //     // use the strategy that gets set in the restakeManager_switchTokenAndDelegator function to determine which type of slashing to perform
+        // Slash native ETH if OperatorDelegator has any staked in EigenLayer
+        if (nativeEthShares > 0) {
+            // calculate the amount to slash from the native ETH share balance
+            uint256 slashingAmountNativeShares = (((nativeEthShares * 1e18) *
+                slashingPercentInBps) / 10_000) / 1e18;
 
-    //     try operatorDelegator.getStrategyIndex(wethStrategy) {
-    //         // if it returns a value, weth is in the strategy list, need to do a native ETH slashing
+            // shares are 1:1 with ETH in EigenPod so can slash the share amount directly
+            ethPOSDepositMock.slash(slashingAmountNativeShares);
 
-    //     } catch {
-    //         // if it reverts, operatorDelegator is using an LST strategy
+            // update the OperatorDelegator's share balance in EL by calling EigenPodManager as the pod
+            address podAddress = address(eigenPodManager.getPod(address(activeOperatorDelegator)));
+            vm.prank(podAddress);
+            eigenPodManager.recordBeaconChainETHBalanceUpdate(
+                address(activeOperatorDelegator),
+                -int256(slashingAmountNativeShares)
+            );
+        }
 
-    //         // burn tokens in strategy to ensure they don't effect accounting
-    //         vm.prank(strat);
+        // Slash LST if OperatorDelegator has any staked in EigenLayer
+        if (lstShares > 0) {
+            // calculate the amount to slash from the LST share balance
+            uint slashingAmountLSTShares = (((lstShares * 1e18) * slashingPercentInBps) / 10_000) /
+                1e18;
+            // convert share amount to slash to collateral token
+            uint slashingAmountLSTToken = activeStrategy.sharesToUnderlyingView(
+                slashingAmountLSTShares
+            );
 
-    //         // remove shares to update operatorDelegator's accounting
-    //         vm.prank(delegationManager);
-    //         strategyManager.removeShares()
-    //     }
-    // }
+            // burn tokens in strategy to ensure they don't effect accounting
+            vm.prank(address(activeStrategy));
+            IERC20(activeCollateralToken).transfer(TOKEN_BURN_ADDRESS, slashingAmountLSTToken);
+
+            // remove shares to update operatorDelegator's accounting
+            vm.prank(address(delegation));
+            _removeSharesFromStrategyManager(
+                address(activeOperatorDelegator),
+                address(activeStrategy),
+                slashingAmountLSTShares
+            );
+            console2.log(
+                "OperatorDelegator LST shares after: ",
+                activeStrategy.shares(address(activeOperatorDelegator))
+            );
+        }
+    }
 
     // NOTE: can add extra source of randomness by fuzzing the allocation parameters for OperatorDelegator
     function restakeManager_deployTokenStratOperatorDelegator() public {
@@ -356,6 +392,7 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
         // sets the currently active collateral token and OperatorDelegator for access in tests
         activeOperatorDelegator = OperatorDelegator(payable(address(operatorDelegatorToAdd)));
         activeCollateralToken = MockERC20(address(collateralTokenToAdd));
+        activeStrategy = strategyToAdd;
 
         // set token strategy in the OperatorDelegator
         activeOperatorDelegator.setTokenStrategy(collateralTokenToAdd, strategyToAdd);

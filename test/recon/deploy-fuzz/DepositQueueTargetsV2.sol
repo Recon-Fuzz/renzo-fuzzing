@@ -28,7 +28,7 @@ abstract contract DepositQueueTargetsV2 is SetupV2 {
 
         // this creates a validator deployed via an EigenPod once the DepositQueue has at least 32 ETH in it
         depositQueue.stakeEthFromQueue(operatorDelegator, pubkey, signature, depositDataRoot);
-        console2.log("operator delegator address: ", address(operatorDelegator));
+        // console2.log("operator delegator address: ", address(operatorDelegator));
 
         // update shares of the OperatorDelegator (EigenPod owner) to simulate a validation of a beacon chain state proof of the validator balance
         // NOTE: shares of EigenPod are exchangeable 1:1 with the ETH staked in the validator node
@@ -38,9 +38,9 @@ abstract contract DepositQueueTargetsV2 is SetupV2 {
         eigenPodManager.recordBeaconChainETHBalanceUpdate(address(operatorDelegator), 32 ether);
 
         // verifying pod owner shares accounting
-        console2.log(
-            "pod owner shares before: ",
-            eigenPodManager.podOwnerShares(address(operatorDelegator))
-        );
+        // console2.log(
+        //     "pod owner shares before: ",
+        //     eigenPodManager.podOwnerShares(address(operatorDelegator))
+        // );
     }
 }

@@ -85,7 +85,7 @@ abstract contract RestakeManagerTargets is BaseTargetFunctions, DepositQueueTarg
         IERC20(collateralToken).transfer(address(depositQueue), amount);
     }
 
-    function restakeManager_slash() public {
-        ethPOSDepositMock.slash();
+    function restakeManager_slash(uint256 amount) public {
+        ethPOSDepositMock.slash(amount);
     }
 }
