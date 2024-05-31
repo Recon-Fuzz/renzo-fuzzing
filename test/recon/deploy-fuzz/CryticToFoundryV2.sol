@@ -7,6 +7,7 @@ import { RestakeManagerTargetsV2 } from "./RestakeManagerTargetsV2.sol";
 import { RestakeManagerAdminTargetsV2 } from "./RestakeManagerAdminTargetsV2.sol";
 import { DepositQueueTargetsV2 } from "./DepositQueueTargetsV2.sol";
 import { FoundryAsserts } from "@chimera/FoundryAsserts.sol";
+import "../../mocks/MockAggregatorV3.sol";
 
 contract CryticToFoundryV2 is
     Test,
@@ -152,6 +153,22 @@ contract CryticToFoundryV2 is
 
         // SLASH
         restakeManager_slash_AVS();
+    }
+
+    function test_LST_discounting() public {
+        restakeManager_deployTokenStratOperatorDelegator();
+
+        MockAggregatorV3 activeTokenOracle = collateralTokenOracles[address(activeCollateralToken)];
+
+        (, int256 priceBefore, , , ) = activeTokenOracle.latestRoundData();
+        console2.log("priceBefore: ", priceBefore);
+
+        restakeManager_LST_discount(50);
+
+        (, int256 priceAfter, , , ) = activeTokenOracle.latestRoundData();
+        console2.log("priceAfter: ", priceAfter);
+
+        assertTrue(priceBefore != priceAfter, "price doesn't change");
     }
 
     // NOTE: this is needed for handling gas refunds from call to stakeEthFromQueue

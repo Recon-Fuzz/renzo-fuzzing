@@ -197,6 +197,24 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
         }
     }
 
+    function restakeManager_LST_discount(uint256 discount) public {
+        // assume a max discount of 500 basis points, on par with historical depeg for stETH discussed here: https://medium.com/huobi-research/steth-depegging-what-are-the-consequences-20b4b7327b0c
+        discount = discount % 500;
+
+        // get the oracle for the active collateral token and set the price on it
+        MockAggregatorV3 activeTokenOracle = collateralTokenOracles[address(activeCollateralToken)];
+
+        // apply discount to current price
+        (, int256 currentPrice, , , ) = activeTokenOracle.latestRoundData();
+
+        int256 discountedPrice = currentPrice -
+            ((currentPrice * 1e18 * int256(discount)) / 10_000) /
+            1e18;
+
+        // set new price in oracle
+        activeTokenOracle.setPrice(discountedPrice);
+    }
+
     // NOTE: can add extra source of randomness by fuzzing the allocation parameters for OperatorDelegator
     function restakeManager_deployTokenStratOperatorDelegator() public {
         // NOTE: TEMPORARY
