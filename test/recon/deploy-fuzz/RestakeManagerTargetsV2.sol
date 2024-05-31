@@ -108,7 +108,7 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
         // OperatorDelegators are what make the call to deploy EigenPod and so are the owner of the created pod
         IOperatorDelegator operatorDelegator = _getRandomOperatorDelegator(operatorDelegatorIndex);
 
-        uint256 podOwnerSharesBefore = eigenPodManager.podOwnerShares(address(operatorDelegator));
+        int256 podOwnerSharesBefore = eigenPodManager.podOwnerShares(address(operatorDelegator));
 
         // reduces the balance of the deposit contract by the max slashing penalty (1 ETH)
         ethPOSDepositMock.slash();
@@ -118,7 +118,7 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
         vm.prank(podAddress);
         eigenPodManager.recordBeaconChainETHBalanceUpdate(address(operatorDelegator), -1 ether);
 
-        uint256 podOwnerSharesAfter = eigenPodManager.podOwnerShares(address(operatorDelegator));
+        int256 podOwnerSharesAfter = eigenPodManager.podOwnerShares(address(operatorDelegator));
 
         // check that share allocation is properly decreased
         require(podOwnerSharesAfter < podOwnerSharesBefore, "pod owner shares don't decrease");
@@ -144,8 +144,8 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
     //     //       but if an OperatorDelegator has multiple strategies associated with it, this logic will have to be refactored to appropriately slash each
 
     //     // Native ETH slashing
-    //     // check if the weth strategy is in the OperatorDelegator's strategy list
-    //     // this reverts if the strategy isn't in the list so needs to be caught
+    //     // use the strategy that gets set in the restakeManager_switchTokenAndDelegator function to determine which type of slashing to perform
+
     //     try operatorDelegator.getStrategyIndex(wethStrategy) {
     //         // if it returns a value, weth is in the strategy list, need to do a native ETH slashing
 
