@@ -126,26 +126,15 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
         require(podOwnerSharesAfter < podOwnerSharesBefore, "pod owner shares don't decrease");
     }
 
-    // Slasher interface implies that Staker's accounting is updated as well as part of their stake being lost in recordStakeUpdate
-    // AVS slashing is likely to be a percentage of funds held by the OperatorDelegator instead of a fixed amount like for native
-    // NOTE:For EigenLayer, the ETH held in depositQueue is irrelevant, because it doesn't represent a stake in EigenLayer
-    //      so slashing only effects the amount actually deposited by an OperatorDelegator
-
-    // The following are the only cases that the EigenLayer system would have an effect on balances via slashing:
-    // Native ETH: OperatorDelegator has created a validator with the staked ETH (at least 32 ETH deposited)
-    // LSTs: OperatorDelegator has received deposits greater than the withdrawQueue buffer amount
+    // The following are the only cases that the EigenLayer system would have an effect on balances via slashing,
+    // other cases where an amount is deposited but held in a queue would essentially be invisible to EigenLayer and therefore aren't covered here:
+    // - Native ETH: OperatorDelegator has created a validator with the staked ETH (at least 32 ETH deposited)
+    // - LSTs: OperatorDelegator has received deposits greater than the withdrawQueue buffer amount
     function restakeManager_slash_AVS() public {
         uint256 slashingPercentInBps = 300;
-        // precondition that checks whether ETH has actually been staked in a validator (native) or deposited (LST)
 
-        // NOTE: assuming a 3% slashing of OperatorDelegator's entire holdings, similar to the 1/32 ETH for native slashing
-        //       but this means that if a OperatorDelegator has multiple validators, they would each experience a 3% reduction
-
-        // NOTE: because current deployment setup only sets one collateral token for a given OperatorDelegator there are only two possible stakes that can be slashed (LST and native ETH),
-        //       but if an OperatorDelegator has multiple strategies associated with it, this logic will have to be refactored to appropriately slash each
-
-        // NOTE: Any OperatorDelegator has two possible stakes in EL, the LSTs in its strategy list and native ETH
-        //       the slashings conducted are dependant on the shares the OperatorDelegator has in each
+        // NOTE: Because current deployment setup only sets one collateral token for a given OperatorDelegator there are only two possible stakes that can be slashed (LST and native ETH),
+        //       but if an OperatorDelegator has multiple strategies associated with it, this logic will have to be refactored to appropriately slash each. The slashings conducted are dependant on the shares the OperatorDelegator has in each
         uint256 nativeEthShares = uint256(
             eigenPodManager.podOwnerShares(address(activeOperatorDelegator))
         );
