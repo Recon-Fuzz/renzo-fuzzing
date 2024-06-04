@@ -204,6 +204,12 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
         activeTokenOracle.setPrice(discountedPrice);
     }
 
+    function restakeManager_LST_rebase(uint256 priceChangePercentage) public {
+        // check that the last rebase was > 24 hours ago because rebases only happen once daily when beacon chain ether balance is updated
+        // clamp the priceChangePercentage to be within the bounds of a rebase amount in stETH
+        // increase the price in the exchange rate of the oracle to reflect the rebase event
+    }
+
     // NOTE: can add extra source of randomness by fuzzing the allocation parameters for OperatorDelegator
     function restakeManager_deployTokenStratOperatorDelegator() public {
         // NOTE: TEMPORARY
