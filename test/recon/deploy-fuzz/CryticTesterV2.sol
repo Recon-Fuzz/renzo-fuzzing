@@ -17,4 +17,7 @@ contract CryticTesterV2 is
     constructor() payable {
         setup();
     }
+
+    // NOTE: this is needed for handling gas refunds from call to stakeEthFromQueue
+    fallback() external {}
 }
