@@ -105,6 +105,8 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
         IERC20(collateralToken).transfer(address(depositQueue), amount);
     }
 
+    event Debug(uint256 balance);
+
     // @notice simulates a native slashing event on one of the validators that gets created by OperatorDelegator::stakeEth
     function restakeManager_slash_native(uint256 operatorDelegatorIndex) public {
         // OperatorDelegators are what make the call to deploy EigenPod and so are the owner of the created pod
@@ -113,7 +115,12 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
         int256 podOwnerSharesBefore = eigenPodManager.podOwnerShares(address(operatorDelegator));
 
         // reduces the balance of the deposit contract by the max slashing penalty (1 ETH)
-        ethPOSDepositMock.slash(1 ether);
+        try ethPOSDepositMock.slash(1 ether) {} catch {
+            // @audit checking if failing is because deposit contract doesn't have any eth in it
+            // would imply that run is too short and depositQueue_stakeEthFromQueue hasn't successfully been called yet
+            emit Debug(address(ethPOSDepositMock).balance);
+            t(false, "call to ethPOSDepositMock.slash fails");
+        }
 
         // update the OperatorDelegator's share balance in EL by calling EigenPodManager as the pod
         address podAddress = address(eigenPodManager.getPod(address(operatorDelegator)));
