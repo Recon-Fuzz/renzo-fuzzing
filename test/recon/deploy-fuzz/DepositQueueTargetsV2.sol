@@ -45,4 +45,7 @@ abstract contract DepositQueueTargetsV2 is BaseTargetFunctions, SetupV2 {
         vm.prank(podAddress);
         eigenPodManager.recordBeaconChainETHBalanceUpdate(address(operatorDelegator), 32 ether);
     }
+
+    // NOTE: this is needed for handling gas refunds from call to stakeEthFromQueue
+    fallback() external {}
 }
