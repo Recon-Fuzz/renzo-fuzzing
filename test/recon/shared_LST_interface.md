@@ -8,6 +8,17 @@
 	- since this interface will only be used for fork testing to wrap the actually deployed LST tokens with extra functionality, instead of minting, can transfer from a whale address to the target user
 	- burning is irrelevant here because no LSTs are redeemed for their underlying ETH in any logic in Renzo or EigenLayer
 
+- rebasing LSTs only need to be simulated in the Renzo system locally via a change in the price of the LST/ezETH which user receives when depositing
+	- when a user is withdrawing from the system, accounting for the amount withdrawn is via the amount of ezETH and LST tokens held by the system, so independent of price returned by oracle
+	- an increase in the price of the LST relative to ezETH would indicate a rebasing event 
+		- user receives more ezETH when depositing
+	- because price in the Renzo system is determined by an oracle, we can just introduce a function (`restakeManager_LST_rebase`) that increases the price of the LST relate to ezETH to simulate a rebase  
+		- given that stETH has a [max daily rebase limit](https://docs.lido.fi/guides/lido-tokens-integration-guide/#accounting-oracle) of .074%, this will have a proportional increase on the exchange rate returned by the oracle (NOTE: not quite sure of this, might require more proof that increase in supply is directly proportional to price, oracle calculation may disprove this)
+
+- accounting for LSTs used in Renzo is virtual, meaning that the actual supply of the tokens doesn't change with a rebase event 
+	- the result is that only the exchange rate between the LST/ezETH is effected during a rebase event and so is the only thing that needs to be simulated to replicate a rebase in the system 
+		
+
 - starting with implementing a shared interface for stETH, wBETH for simplicity because they're what's supported by Renzo:
 	- [stETH](https://etherscan.io/address/0x17144556fd3424edc8fc8a4c940b2d04936d17eb#code)
 		- uses `_mintShares` to create more shares and assign them to a recipient without increasing the token total supply

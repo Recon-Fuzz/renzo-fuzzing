@@ -49,72 +49,72 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
     event Debug(uint256 balance);
     event SenderBalance(uint256);
 
-    // function restakeManager_deposit(uint256 tokenIndex, uint256 amount) public {
-    //     IERC20 collateralToken = IERC20(_getRandomDepositableToken(tokenIndex));
-    //     amount = amount % IERC20(collateralToken).balanceOf(address(this));
+    function restakeManager_deposit(uint256 tokenIndex, uint256 amount) public {
+        IERC20 collateralToken = IERC20(_getRandomDepositableToken(tokenIndex));
+        amount = amount % IERC20(collateralToken).balanceOf(address(this));
 
-    //     restakeManager.deposit(collateralToken, amount);
-    // }
+        restakeManager.deposit(collateralToken, amount);
+    }
 
-    // // NOTE: allowing this to use fully random referralId for now, could test depositing for invalid referrals with a properly defined property
-    // function restakeManager_depositReferral(
-    //     uint256 tokenIndex,
-    //     uint256 amount,
-    //     uint256 referralId
-    // ) public {
-    //     IERC20 collateralToken = IERC20(_getRandomDepositableToken(tokenIndex));
-    //     amount = amount % IERC20(collateralToken).balanceOf(address(this));
+    function restakeManager_depositReferral(
+        uint256 tokenIndex,
+        uint256 amount,
+        uint256 referralId
+    ) public {
+        IERC20 collateralToken = IERC20(_getRandomDepositableToken(tokenIndex));
+        amount = amount % IERC20(collateralToken).balanceOf(address(this));
 
-    //     restakeManager.deposit(collateralToken, amount, referralId);
-    // }
+        restakeManager.deposit(collateralToken, amount, referralId);
+    }
 
     function restakeManager_depositETH() public payable {
-        // restakeManager.depositETH{ value: msg.value }();
         // @audit adding in try/catch to see if this is reverting for some reason
         try restakeManager.depositETH{ value: msg.value }() {
             // t(false, "call to depositETH succeeds");
         } catch {
-            t(false, "call to depositETH fails");
+            // t(false, "call to depositETH fails");
         }
     }
 
-    // function restakeManager_depositETHReferral(uint256 referralId) public payable {
-    //     restakeManager.depositETH{ value: msg.value }(referralId);
-    // }
+    function restakeManager_depositETHReferral(uint256 referralId) public payable {
+        restakeManager.depositETH{ value: msg.value }(referralId);
+    }
 
-    // // NOTE: danger, setting TVL limits is probably an action that will be taken by admins infrequently
-    // // breaking properties that result from this may need a better mechanism for switching limits, potentially a binary for on and off without caring about limit amount
-    // function restakeManager_setTokenTvlLimit(uint256 tokenIndex, uint256 amount) public {
-    //     address tokenToLimit = _getRandomDepositableToken(tokenIndex);
+    function restakeManager_setTokenTvlLimit(uint256 tokenIndex, uint256 amount) public {
+        address tokenToLimit = _getRandomDepositableToken(tokenIndex);
 
-    //     restakeManager.setTokenTvlLimit(IERC20(tokenToLimit), amount);
-    // }
+        restakeManager.setTokenTvlLimit(IERC20(tokenToLimit), amount);
+    }
 
-    // // NOTE: danger, this allows the fuzzer to fill the buffer but may have unintended side-effects for overall system behavior
-    // function restakeManager_fillBuffer(uint256 collateralTokenIndex) public {
-    //     address collateralToken = _getRandomDepositableToken(collateralTokenIndex);
+    /**
+        External System Manipulation - see externalities file for more explanation on these
+    */
 
-    //     uint256 bufferToFill = depositQueue.withdrawQueue().getBufferDeficit(
-    //         address(collateralToken)
-    //     );
+    // NOTE: danger, this allows the fuzzer to fill the buffer but may have unintended side-effects for overall system behavior
+    function restakeManager_fillBuffer(uint256 collateralTokenIndex) public {
+        address collateralToken = _getRandomDepositableToken(collateralTokenIndex);
 
-    //     // the target contract gets minted both of the collateral tokens in setup
-    //     IERC20(collateralToken).transfer(address(depositQueue.withdrawQueue()), bufferToFill);
-    // }
+        uint256 bufferToFill = depositQueue.withdrawQueue().getBufferDeficit(
+            address(collateralToken)
+        );
 
-    // // @notice simulates accrual of staking rewards that get sent to DepositQueue
-    // // @dev this is needed to allow coverage of the depositTokenRewardsFromProtocol function
-    // function restakeManager_simulateRewardsAccrual(
-    //     uint256 collateralTokenIndex,
-    //     uint256 amount
-    // ) public {
-    //     address collateralToken = _getRandomDepositableToken(collateralTokenIndex);
-    //     amount = amount % IERC20(collateralToken).balanceOf(address(this));
+        // the target contract gets minted both of the collateral tokens in setup
+        IERC20(collateralToken).transfer(address(depositQueue.withdrawQueue()), bufferToFill);
+    }
 
-    //     IERC20(collateralToken).transfer(address(depositQueue), amount);
-    // }
+    /// @notice simulates accrual of staking rewards that get sent to DepositQueue
+    /// @dev this is needed to allow coverage of the depositTokenRewardsFromProtocol function
+    function restakeManager_simulateRewardsAccrual(
+        uint256 collateralTokenIndex,
+        uint256 amount
+    ) public {
+        address collateralToken = _getRandomDepositableToken(collateralTokenIndex);
+        amount = amount % IERC20(collateralToken).balanceOf(address(this));
 
-    // @notice simulates a native slashing event on one of the validators that gets created by OperatorDelegator::stakeEth
+        IERC20(collateralToken).transfer(address(depositQueue), amount);
+    }
+
+    /// @notice simulates a native slashing event on one of the validators that gets created by OperatorDelegator::stakeEth
     function restakeManager_slash_native(uint256 operatorDelegatorIndex) public {
         // OperatorDelegators are what make the call to deploy EigenPod and so are the owner of the created pod
         IOperatorDelegator operatorDelegator = _getRandomOperatorDelegator(operatorDelegatorIndex);
@@ -122,14 +122,11 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
         int256 podOwnerSharesBefore = eigenPodManager.podOwnerShares(address(operatorDelegator));
 
         // reduces the balance of the deposit contract by the max slashing penalty (1 ETH)
-        try ethPOSDepositMock.slash(1 ether) {
-            // emit Debug(address(ethPOSDepositMock).balance);
-            // t(false, "call to ethPOSDepositMock.slash succeeds");
-        } catch {
+        try ethPOSDepositMock.slash(1 ether) {} catch {
             // @audit checking if failing is because deposit contract doesn't have any eth in it
             // would imply that run is too short and depositQueue_stakeEthFromQueue hasn't successfully been called yet
-            emit Debug(address(ethPOSDepositMock).balance);
-            t(false, "call to ethPOSDepositMock.slash fails");
+            // emit Debug(address(ethPOSDepositMock).balance);
+            // t(false, "call to ethPOSDepositMock.slash fails");
         }
 
         // update the OperatorDelegator's share balance in EL by calling EigenPodManager as the pod
@@ -143,105 +140,122 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
         require(podOwnerSharesAfter < podOwnerSharesBefore, "pod owner shares don't decrease");
     }
 
-    // function restakeManager_test_slash_native(uint256 _operatorDelegatorIndex) public payable {
-    //     restakeManager_deployTokenStratOperatorDelegator();
+    /// @notice simulates a native slashing event with ETH deposit values to ensure successful slashing
+    function restakeManager_clamped_slash_native(uint256 _operatorDelegatorIndex) public payable {
+        restakeManager_deployTokenStratOperatorDelegator();
 
-    //     restakeManager.depositETH{ value: 32 ether }();
+        restakeManager.depositETH{ value: 32 ether }();
 
-    //     bytes memory pubkey = hex"123456";
-    //     bytes memory signature = hex"789101";
-    //     bytes32 dataRoot = bytes32(uint256(0xbeef));
+        bytes memory pubkey = hex"123456";
+        bytes memory signature = hex"789101";
+        bytes32 dataRoot = bytes32(uint256(0xbeef));
 
-    //     // @audit this was being skipped in initial test but is likely the source of reverts causing issues
-    //     depositQueue_stakeEthFromQueue(_operatorDelegatorIndex, pubkey, signature, dataRoot);
+        depositQueue_stakeEthFromQueue(_operatorDelegatorIndex, pubkey, signature, dataRoot);
 
-    //     restakeManager_slash_native(_operatorDelegatorIndex);
-    // }
+        restakeManager_slash_native(_operatorDelegatorIndex);
+    }
 
-    // The following are the only cases that the EigenLayer system would have an effect on balances via slashing,
-    // other cases where an amount is deposited but held in a queue would essentially be invisible to EigenLayer and therefore aren't covered here:
-    // - Native ETH: OperatorDelegator has created a validator with the staked ETH (at least 32 ETH deposited)
-    // - LSTs: OperatorDelegator has received deposits greater than the withdrawQueue buffer amount
-    // function restakeManager_slash_AVS() public {
-    //     uint256 slashingPercentInBps = 300;
+    /// @notice simulates and AVS slashing event on EigenLayer for native ETH and LSTs held by an OperatorDelegator
+    function restakeManager_slash_AVS() public {
+        uint256 slashingPercentInBps = 300;
 
-    //     // NOTE: Because current deployment setup only sets one collateral token for a given OperatorDelegator there are only two possible stakes that can be slashed (LST and native ETH),
-    //     //       but if an OperatorDelegator has multiple strategies associated with it, this logic will have to be refactored to appropriately slash each. The slashings conducted are dependant on the shares the OperatorDelegator has in each
-    //     uint256 nativeEthShares = uint256(
-    //         eigenPodManager.podOwnerShares(address(activeOperatorDelegator))
-    //     );
-    //     uint256 lstShares = activeStrategy.shares(address(activeOperatorDelegator));
+        // NOTE: Because current deployment setup only sets one collateral token for a given OperatorDelegator there are only two possible stakes that can be slashed (LST and native ETH),
+        //       but if an OperatorDelegator has multiple strategies associated with it, this logic will have to be refactored to appropriately slash each.
+        //       The slashings conducted are dependant on the shares the OperatorDelegator has in each
+        uint256 nativeEthShares = uint256(
+            eigenPodManager.podOwnerShares(address(activeOperatorDelegator))
+        );
+        uint256 lstShares = activeStrategy.shares(address(activeOperatorDelegator));
 
-    //     // Slash native ETH if OperatorDelegator has any staked in EigenLayer
-    //     if (nativeEthShares > 0) {
-    //         // calculate the amount to slash from the native ETH share balance
-    //         uint256 slashingAmountNativeShares = (((nativeEthShares * 1e18) *
-    //             slashingPercentInBps) / 10_000) / 1e18;
+        // Slash native ETH if OperatorDelegator has any staked in EigenLayer
+        if (nativeEthShares > 0) {
+            // calculate the amount to slash from the native ETH share balance
+            uint256 slashingAmountNativeShares = (((nativeEthShares * 1e18) *
+                slashingPercentInBps) / 10_000) / 1e18;
 
-    //         // shares are 1:1 with ETH in EigenPod so can slash the share amount directly
-    //         ethPOSDepositMock.slash(slashingAmountNativeShares);
+            // shares are 1:1 with ETH in EigenPod so can slash the share amount directly
+            ethPOSDepositMock.slash(slashingAmountNativeShares);
 
-    //         // update the OperatorDelegator's share balance in EL by calling EigenPodManager as the pod
-    //         address podAddress = address(eigenPodManager.getPod(address(activeOperatorDelegator)));
-    //         vm.prank(podAddress);
-    //         eigenPodManager.recordBeaconChainETHBalanceUpdate(
-    //             address(activeOperatorDelegator),
-    //             -int256(slashingAmountNativeShares)
-    //         );
-    //     }
+            // update the OperatorDelegator's share balance in EL by calling EigenPodManager as the pod
+            address podAddress = address(eigenPodManager.getPod(address(activeOperatorDelegator)));
+            vm.prank(podAddress);
+            eigenPodManager.recordBeaconChainETHBalanceUpdate(
+                address(activeOperatorDelegator),
+                -int256(slashingAmountNativeShares)
+            );
+        }
 
-    //     // Slash LST if OperatorDelegator has any staked in EigenLayer
-    //     if (lstShares > 0) {
-    //         // calculate the amount to slash from the LST share balance
-    //         uint slashingAmountLSTShares = (((lstShares * 1e18) * slashingPercentInBps) / 10_000) /
-    //             1e18;
-    //         // convert share amount to slash to collateral token
-    //         uint slashingAmountLSTToken = activeStrategy.sharesToUnderlyingView(
-    //             slashingAmountLSTShares
-    //         );
+        // Slash LST if OperatorDelegator has any staked in EigenLayer
+        if (lstShares > 0) {
+            // calculate the amount to slash from the LST share balance
+            uint slashingAmountLSTShares = (((lstShares * 1e18) * slashingPercentInBps) / 10_000) /
+                1e18;
+            // convert share amount to slash to collateral token
+            uint slashingAmountLSTToken = activeStrategy.sharesToUnderlyingView(
+                slashingAmountLSTShares
+            );
 
-    //         // burn tokens in strategy to ensure they don't effect accounting
-    //         vm.prank(address(activeStrategy));
-    //         IERC20(activeCollateralToken).transfer(TOKEN_BURN_ADDRESS, slashingAmountLSTToken);
+            // burn tokens in strategy to ensure they don't effect accounting
+            vm.prank(address(activeStrategy));
+            IERC20(activeCollateralToken).transfer(TOKEN_BURN_ADDRESS, slashingAmountLSTToken);
 
-    //         // remove shares to update operatorDelegator's accounting
-    //         vm.prank(address(delegation));
-    //         _removeSharesFromStrategyManager(
-    //             address(activeOperatorDelegator),
-    //             address(activeStrategy),
-    //             slashingAmountLSTShares
-    //         );
-    //         console2.log(
-    //             "OperatorDelegator LST shares after: ",
-    //             activeStrategy.shares(address(activeOperatorDelegator))
-    //         );
-    //     }
-    // }
+            // remove shares to update operatorDelegator's accounting
+            vm.prank(address(delegation));
+            _removeSharesFromStrategyManager(
+                address(activeOperatorDelegator),
+                address(activeStrategy),
+                slashingAmountLSTShares
+            );
+        }
+    }
 
-    // function restakeManager_LST_discount(uint256 discount) public {
-    //     // assume a max discount of 500 basis points, on par with historical depeg for stETH discussed here: https://medium.com/huobi-research/steth-depegging-what-are-the-consequences-20b4b7327b0c
-    //     discount = discount % 500;
+    /// @notice simulates a discount in the price of an LST token in the system via the price returned by the oracle
+    function restakeManager_LST_discount(uint256 discount) public {
+        // assume a max discount of 500 basis points, on par with historical depeg for stETH discussed here: https://medium.com/huobi-research/steth-depegging-what-are-the-consequences-20b4b7327b0c
+        discount = discount % 500;
 
-    //     // get the oracle for the active collateral token and set the price on it
-    //     MockAggregatorV3 activeTokenOracle = collateralTokenOracles[address(activeCollateralToken)];
+        // get the oracle for the active collateral token and set the price on it
+        MockAggregatorV3 activeTokenOracle = collateralTokenOracles[address(activeCollateralToken)];
 
-    //     // apply discount to current price
-    //     (, int256 currentPrice, , , ) = activeTokenOracle.latestRoundData();
+        // apply discount to current price
+        (, int256 currentPrice, , , ) = activeTokenOracle.latestRoundData();
 
-    //     int256 discountedPrice = currentPrice -
-    //         ((currentPrice * 1e18 * int256(discount)) / 10_000) /
-    //         1e18;
+        int256 discountedPrice = currentPrice -
+            ((currentPrice * 1e18 * int256(discount)) / 10_000) /
+            1e18;
 
-    //     // set new price in oracle
-    //     activeTokenOracle.setPrice(discountedPrice);
-    // }
+        // set new price in oracle
+        activeTokenOracle.setPrice(discountedPrice);
+    }
 
-    // function restakeManager_LST_rebase(uint256 priceChangePercentage) public {
-    //     // check that the last rebase was > 24 hours ago because rebases only happen once daily when beacon chain ether balance is updated
-    //     // clamp the priceChangePercentage to be within the bounds of a rebase amount in stETH
-    //     // increase the price in the exchange rate of the oracle to reflect the rebase event
-    // }
+    /// @notice simulates a rebase of an LST token as a corresponding increase in the price of the LST token relative to ezETH
+    /// @dev see shared_LST_interface for a more detailed description of the design decisions
+    function restakeManager_LST_rebase(uint256 priceChangePercentage) public {
+        // check that the last rebase was > 24 hours ago because rebases only happen once daily when beacon chain ether balance is updated
+        require(block.timestamp >= lastRebase + 24 hours);
 
+        // get the oracle for the active collateral token and set the price on it
+        MockAggregatorV3 activeTokenOracle = collateralTokenOracles[address(activeCollateralToken)];
+
+        // clamp the priceChangePercentage to be within the bounds of a rebase amount in stETH
+        // NOTE: using max price change percentage directly porportional to max supply increase in a rebase for stETH of .074% rounded down to nearest basis point
+        priceChangePercentage = priceChangePercentage % 7;
+
+        // increase the price in the exchange rate of the oracle to reflect the rebase event
+        (, int256 currentPrice, , , ) = activeTokenOracle.latestRoundData();
+
+        int256 rebasedPrice = currentPrice +
+            ((currentPrice * 1e18 * int256(priceChangePercentage)) / 10_000) /
+            1e18;
+
+        // set new price in oracle
+        activeTokenOracle.setPrice(rebasedPrice);
+
+        // set new last rebase time
+        lastRebase = block.timestamp;
+    }
+
+    /// @notice deploys a collateral token with a corresponding strategy (in EigenLayer) and OperatorDelegator
     // NOTE: can add extra source of randomness by fuzzing the allocation parameters for OperatorDelegator
     function restakeManager_deployTokenStratOperatorDelegator() public {
         // NOTE: TEMPORARY
@@ -398,6 +412,7 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
         }
     }
 
+    /// @notice switches the active token and OperatorDelegator in the system
     function restakeManager_switchTokenAndDelegator(
         uint256 operatorDelegatorIndex,
         // uint256 collateralTokenIndex
