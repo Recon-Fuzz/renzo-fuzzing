@@ -14,6 +14,10 @@ The decision was made to reduce a given OperatorDelegator's stake by 3% as this 
 
 Note that unlike the native ETH slashing implemented in `restakeManager_slash_native` where only an individual validator owned by the OperatorDelegator is slashed, in this implementation if the OperatorDelegator owns multiple validators, they're all collectively slashed by 3%. This seems like it would be a logical penalty applied by EigenLayer since AVS slashing is meant to punish Operators that misbehave, and since in the Renzo system each OperatorDelegator corresponds to 1 Operator, a slash on the Operator would apply over all the Operator's validators.
 
+The following are the only cases that the EigenLayer system would have an effect on balances via slashing, other cases where an amount is deposited but held in a queue would essentially be invisible to EigenLayer and therefore aren't covered in the tests since they would be unaffected by an AVS slashing event:
+    - Native ETH: OperatorDelegator has created a validator with the staked ETH (at least 32 ETH deposited)
+    - LSTs: OperatorDelegator has received deposits greater than the withdrawQueue buffer amount
+    
 ### LST Discounting
 LST discounting would be due to a depegging event between the price of the LST token and the underlying staked ETH. The function implemented to mimic this in `RestakManagerTagetsV2::restakeManager_LST_discount` modifies the oracle price using the most recent price by discounting it up to 500 basis points. 
 

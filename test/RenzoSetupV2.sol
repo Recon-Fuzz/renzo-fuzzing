@@ -43,6 +43,9 @@ contract RenzoSetupV2 is EigenLayerSetupV2 {
 
     mapping(address => MockAggregatorV3) internal collateralTokenOracles;
 
+    /// @notice deploys the Renzo system based on their hardhat script
+    /// @dev this doesn't deploy collateral tokens or OperatorDelegators as these deployments are handled by restakeManager_deployTokenStratOperatorDelegator
+    /// @param eigenLayerLocal determines whether the EigenLayer system is deployed locally or in a forked environment
     function deployRenzo(bool eigenLayerLocal) internal {
         renzoProxyAdmin = new ProxyAdmin();
 
@@ -202,7 +205,6 @@ contract RenzoSetupV2 is EigenLayerSetupV2 {
         return address(collateralTokens[tokenIndex % collateralTokens.length]);
     }
 
-    // TODO: need to refactor this to work with OperatorDelegator array defined in RestakeManagerTargetsV2
     function _getRandomOperatorDelegator(
         uint256 operatorDelegatorIndex
     ) internal view returns (IOperatorDelegator operatorDelegator) {

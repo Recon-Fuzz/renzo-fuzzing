@@ -10,14 +10,11 @@ import { CryticAsserts } from "@chimera/CryticAsserts.sol";
 // medusa fuzz
 contract CryticTesterV2 is
     RestakeManagerTargetsV2,
-    RestakeManagerAdminTargetsV2,
+    // RestakeManagerAdminTargetsV2,
     DepositQueueTargetsV2,
     CryticAsserts
 {
     constructor() payable {
         setup();
     }
-
-    // NOTE: this is needed for handling gas refunds from call to stakeEthFromQueue
-    fallback() external {}
 }
