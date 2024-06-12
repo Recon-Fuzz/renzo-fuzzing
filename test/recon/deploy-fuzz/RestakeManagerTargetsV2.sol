@@ -35,6 +35,7 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
     uint8 internal decimals;
     uint256 internal initialMintPerUsers;
     uint256 internal initialBufferTarget = 10_000;
+    uint256 internal lastRebase;
     MockERC20 internal activeCollateralToken;
     OperatorDelegator internal activeOperatorDelegator;
     IStrategy internal activeStrategy;
@@ -74,6 +75,10 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
         } catch {
             // t(false, "call to depositETH fails");
         }
+    }
+
+    function restakeManager_clamped_depositETH() public payable {
+        restakeManager.depositETH{ value: 32 ether }();
     }
 
     function restakeManager_depositETHReferral(uint256 referralId) public payable {
@@ -140,25 +145,8 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
         require(podOwnerSharesAfter < podOwnerSharesBefore, "pod owner shares don't decrease");
     }
 
-    /// @notice simulates a native slashing event with ETH deposit values to ensure successful slashing
-    function restakeManager_clamped_slash_native(uint256 _operatorDelegatorIndex) public payable {
-        restakeManager_deployTokenStratOperatorDelegator();
-
-        restakeManager.depositETH{ value: 32 ether }();
-
-        bytes memory pubkey = hex"123456";
-        bytes memory signature = hex"789101";
-        bytes32 dataRoot = bytes32(uint256(0xbeef));
-
-        depositQueue_stakeEthFromQueue(_operatorDelegatorIndex, pubkey, signature, dataRoot);
-
-        restakeManager_slash_native(_operatorDelegatorIndex);
-    }
-
     /// @notice simulates and AVS slashing event on EigenLayer for native ETH and LSTs held by an OperatorDelegator
-    function restakeManager_slash_AVS() public {
-        uint256 slashingPercentInBps = 300;
-
+    function restakeManager_slash_AVS(uint256 nativeSlashAmount, uint256 lstSlashAmount) public {
         // NOTE: Because current deployment setup only sets one collateral token for a given OperatorDelegator there are only two possible stakes that can be slashed (LST and native ETH),
         //       but if an OperatorDelegator has multiple strategies associated with it, this logic will have to be refactored to appropriately slash each.
         //       The slashings conducted are dependant on the shares the OperatorDelegator has in each
@@ -169,35 +157,30 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
 
         // Slash native ETH if OperatorDelegator has any staked in EigenLayer
         if (nativeEthShares > 0) {
-            // calculate the amount to slash from the native ETH share balance
-            uint256 slashingAmountNativeShares = (((nativeEthShares * 1e18) *
-                slashingPercentInBps) / 10_000) / 1e18;
+            // user can be slashed a max amount of their entire stake
+            nativeSlashAmount = nativeSlashAmount % nativeEthShares;
 
             // shares are 1:1 with ETH in EigenPod so can slash the share amount directly
-            ethPOSDepositMock.slash(slashingAmountNativeShares);
+            ethPOSDepositMock.slash(nativeSlashAmount);
 
             // update the OperatorDelegator's share balance in EL by calling EigenPodManager as the pod
             address podAddress = address(eigenPodManager.getPod(address(activeOperatorDelegator)));
             vm.prank(podAddress);
             eigenPodManager.recordBeaconChainETHBalanceUpdate(
                 address(activeOperatorDelegator),
-                -int256(slashingAmountNativeShares)
+                -int256(nativeSlashAmount)
             );
         }
 
         // Slash LST if OperatorDelegator has any staked in EigenLayer
         if (lstShares > 0) {
-            // calculate the amount to slash from the LST share balance
-            uint slashingAmountLSTShares = (((lstShares * 1e18) * slashingPercentInBps) / 10_000) /
-                1e18;
+            uint256 slashingAmountLSTShares = lstSlashAmount % lstShares;
             // convert share amount to slash to collateral token
-            uint slashingAmountLSTToken = activeStrategy.sharesToUnderlyingView(
-                slashingAmountLSTShares
-            );
+            uint amountLSTToken = activeStrategy.sharesToUnderlyingView(slashingAmountLSTShares);
 
             // burn tokens in strategy to ensure they don't effect accounting
             vm.prank(address(activeStrategy));
-            IERC20(activeCollateralToken).transfer(TOKEN_BURN_ADDRESS, slashingAmountLSTToken);
+            IERC20(activeCollateralToken).transfer(TOKEN_BURN_ADDRESS, amountLSTToken);
 
             // remove shares to update operatorDelegator's accounting
             vm.prank(address(delegation));
@@ -210,19 +193,17 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
     }
 
     /// @notice simulates a discount in the price of an LST token in the system via the price returned by the oracle
-    function restakeManager_LST_discount(uint256 discount) public {
-        // assume a max discount of 500 basis points, on par with historical depeg for stETH discussed here: https://medium.com/huobi-research/steth-depegging-what-are-the-consequences-20b4b7327b0c
-        discount = discount % 500;
-
+    function restakeManager_LST_discount(int256 discount) public {
         // get the oracle for the active collateral token and set the price on it
         MockAggregatorV3 activeTokenOracle = collateralTokenOracles[address(activeCollateralToken)];
 
         // apply discount to current price
         (, int256 currentPrice, , , ) = activeTokenOracle.latestRoundData();
 
-        int256 discountedPrice = currentPrice -
-            ((currentPrice * 1e18 * int256(discount)) / 10_000) /
-            1e18;
+        // clamp discount up to the current price, allows price to go to a minimum of 0
+        discount = discount % currentPrice;
+
+        int256 discountedPrice = currentPrice - discount;
 
         // set new price in oracle
         activeTokenOracle.setPrice(discountedPrice);
@@ -230,23 +211,16 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
 
     /// @notice simulates a rebase of an LST token as a corresponding increase in the price of the LST token relative to ezETH
     /// @dev see shared_LST_interface for a more detailed description of the design decisions
-    function restakeManager_LST_rebase(uint256 priceChangePercentage) public {
+    function restakeManager_LST_rebase(int256 rebasedPrice) public {
         // check that the last rebase was > 24 hours ago because rebases only happen once daily when beacon chain ether balance is updated
         require(block.timestamp >= lastRebase + 24 hours);
 
         // get the oracle for the active collateral token and set the price on it
         MockAggregatorV3 activeTokenOracle = collateralTokenOracles[address(activeCollateralToken)];
 
-        // clamp the priceChangePercentage to be within the bounds of a rebase amount in stETH
-        // NOTE: using max price change percentage directly porportional to max supply increase in a rebase for stETH of .074% rounded down to nearest basis point
-        priceChangePercentage = priceChangePercentage % 7;
-
         // increase the price in the exchange rate of the oracle to reflect the rebase event
         (, int256 currentPrice, , , ) = activeTokenOracle.latestRoundData();
-
-        int256 rebasedPrice = currentPrice +
-            ((currentPrice * 1e18 * int256(priceChangePercentage)) / 10_000) /
-            1e18;
+        require(rebasedPrice > currentPrice); // rebase increases price, decrease in price would be handled by the restakeManager_LST_discount function
 
         // set new price in oracle
         activeTokenOracle.setPrice(rebasedPrice);

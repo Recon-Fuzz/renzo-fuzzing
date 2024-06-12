@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 import { Test } from "forge-std/Test.sol";
-import { console } from "forge-std/console.sol";
+import { console2 } from "forge-std/console2.sol";
 import { RestakeManagerTargetsV2 } from "./RestakeManagerTargetsV2.sol";
 import { RestakeManagerAdminTargetsV2 } from "./RestakeManagerAdminTargetsV2.sol";
 import { DepositQueueTargetsV2 } from "./DepositQueueTargetsV2.sol";
@@ -119,9 +119,9 @@ contract CryticToFoundryV2 is
         bytes memory pubkey = hex"123456";
         bytes memory signature = hex"789101";
         bytes32 dataRoot = bytes32(uint256(0xbeef));
-        console.logBytes(pubkey);
-        console.logBytes(signature);
-        console.logBytes32(dataRoot);
+        console2.logBytes(pubkey);
+        console2.logBytes(signature);
+        console2.logBytes32(dataRoot);
 
         // NOTE: the OperatorDelegator is the owner of the created EigenPod
         depositQueue_stakeEthFromQueue(0, pubkey, signature, dataRoot);
@@ -135,46 +135,62 @@ contract CryticToFoundryV2 is
         // slashing event reduces the balance associated with the validator in EL
     }
 
-    // function test_avs_slashing() public {
-    //     // DEPLOY
-    //     // need to deploy the system first
-    //     restakeManager_deployTokenStratOperatorDelegator();
+    function test_avs_slashing() public {
+        // DEPLOY
+        // need to deploy the system first
+        restakeManager_deployTokenStratOperatorDelegator();
 
-    //     // DEPOSIT
-    //     // make a deposit into the system with LST
-    //     restakeManager_deposit(0, 100_000);
+        // DEPOSIT
+        // make a deposit into the system with LST
+        restakeManager_deposit(0, 100_000);
 
-    //     // make a deposit into system with ETH
-    //     restakeManager.depositETH{ value: 32 ether }();
+        // make a deposit into system with ETH
+        restakeManager.depositETH{ value: 32 ether }();
 
-    //     // DepositQueue calls stakeEthInOperatorDelegator to create a new validator for OperatorDelegator at index 0
-    //     // NOTE: passing in random values here because mock deposit contract doesn't actually check these
-    //     bytes memory pubkey = hex"123456";
-    //     bytes memory signature = hex"789101";
-    //     bytes32 dataRoot = bytes32(uint256(0xbeef));
+        // DepositQueue calls stakeEthInOperatorDelegator to create a new validator for OperatorDelegator at index 0
+        // NOTE: passing in random values here because mock deposit contract doesn't actually check these
+        bytes memory pubkey = hex"123456";
+        bytes memory signature = hex"789101";
+        bytes32 dataRoot = bytes32(uint256(0xbeef));
 
-    //     // NOTE: the OperatorDelegator is the owner of the created EigenPod
-    //     depositQueue_stakeEthFromQueue(0, pubkey, signature, dataRoot);
+        // NOTE: the OperatorDelegator is the owner of the created EigenPod
+        depositQueue_stakeEthFromQueue(0, pubkey, signature, dataRoot);
 
-    //     // SLASH
-    //     restakeManager_slash_AVS();
-    // }
+        // SLASH
+        restakeManager_slash_AVS(32 ether, 10);
+    }
 
-    // function test_LST_discounting() public {
-    //     restakeManager_deployTokenStratOperatorDelegator();
+    function test_LST_rebasing() public {
+        restakeManager_deployTokenStratOperatorDelegator();
 
-    //     MockAggregatorV3 activeTokenOracle = collateralTokenOracles[address(activeCollateralToken)];
+        MockAggregatorV3 activeTokenOracle = collateralTokenOracles[address(activeCollateralToken)];
 
-    //     (, int256 priceBefore, , , ) = activeTokenOracle.latestRoundData();
-    //     console2.log("priceBefore: ", priceBefore);
+        (, int256 priceBefore, , , ) = activeTokenOracle.latestRoundData();
+        console2.log("priceBefore: %e", priceBefore);
 
-    //     restakeManager_LST_discount(50);
+        restakeManager_LST_rebase(2e18);
 
-    //     (, int256 priceAfter, , , ) = activeTokenOracle.latestRoundData();
-    //     console2.log("priceAfter: ", priceAfter);
+        (, int256 priceAfter, , , ) = activeTokenOracle.latestRoundData();
+        console2.log("priceAfter: %e", priceAfter);
 
-    //     assertTrue(priceBefore != priceAfter, "price doesn't change");
-    // }
+        assertTrue(priceBefore != priceAfter, "price doesn't change");
+    }
+
+    function test_LST_discounting() public {
+        restakeManager_deployTokenStratOperatorDelegator();
+
+        MockAggregatorV3 activeTokenOracle = collateralTokenOracles[address(activeCollateralToken)];
+
+        (, int256 priceBefore, , , ) = activeTokenOracle.latestRoundData();
+        console2.log("priceBefore: ", priceBefore);
+
+        restakeManager_LST_discount(500);
+
+        (, int256 priceAfter, , , ) = activeTokenOracle.latestRoundData();
+        console2.log("priceAfter: ", priceAfter);
+
+        assertTrue(priceBefore != priceAfter, "price doesn't change");
+    }
 
     function test_depositQueue_stakeEthFromQueue_() public {
         restakeManager_deployTokenStratOperatorDelegator();
