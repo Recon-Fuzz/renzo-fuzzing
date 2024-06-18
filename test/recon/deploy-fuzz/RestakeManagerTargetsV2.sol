@@ -70,20 +70,20 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
 
     function restakeManager_depositETH(uint256 amount) public payable {
         amount = amount % address(this).balance;
-        restakeManager.depositETH{ value: amount };
+        restakeManager.depositETH{ value: amount }();
     }
 
     function restakeManager_clamped_depositETH() public payable {
         restakeManager.depositETH{ value: 32 ether }();
     }
 
-    function restakeManager_depositETHReferral(uint256 referralId) public payable {
+    function restakeManager_depositETHReferral(uint256 amount, uint256 referralId) public payable {
+        amount = amount % address(this).balance;
         restakeManager.depositETH{ value: msg.value }(referralId);
     }
 
     function restakeManager_setTokenTvlLimit(uint256 tokenIndex, uint256 amount) public {
         address tokenToLimit = _getRandomDepositableToken(tokenIndex);
-
         restakeManager.setTokenTvlLimit(IERC20(tokenToLimit), amount);
     }
 
