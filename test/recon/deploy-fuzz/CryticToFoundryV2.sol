@@ -119,20 +119,33 @@ contract CryticToFoundryV2 is
         bytes memory pubkey = hex"123456";
         bytes memory signature = hex"789101";
         bytes32 dataRoot = bytes32(uint256(0xbeef));
-        console2.logBytes(pubkey);
-        console2.logBytes(signature);
-        console2.logBytes32(dataRoot);
 
+        address operatorDelegator = address(_getRandomOperatorDelegator(0));
         // NOTE: the OperatorDelegator is the owner of the created EigenPod
         depositQueue_stakeEthFromQueue(0, pubkey, signature, dataRoot);
 
         /**
             Slashing the validator
         */
+        uint256 depositContractBalanceBefore = address(ethPOSDepositMock).balance;
+        int256 podOwnerSharesBefore = eigenPodManager.podOwnerShares(operatorDelegator);
+
         // slash the validator for OperatorDelegator at index 0
+        // vm.startPrank(0x9D00906DA19ED95E15a67723B296813B49cC80c7);
         restakeManager_slash_native(0);
+        // vm.stopPrank();
+
+        uint256 depositContractBalanceAfter = address(ethPOSDepositMock).balance;
+        int256 podOwnerSharesAfter = eigenPodManager.podOwnerShares(operatorDelegator);
 
         // slashing event reduces the balance associated with the validator in EL
+        console2.log("balance before: ", depositContractBalanceBefore);
+        console2.log("balance after: ", depositContractBalanceAfter);
+        assertTrue(
+            depositContractBalanceBefore > depositContractBalanceAfter,
+            "deposit contract balance doesn't decrease"
+        );
+        assertTrue(podOwnerSharesBefore > podOwnerSharesAfter, "pod owner shares don't decrease");
     }
 
     function test_avs_slashing() public {

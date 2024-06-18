@@ -120,25 +120,10 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
         // OperatorDelegators are what make the call to deploy EigenPod and so are the owner of the created pod
         IOperatorDelegator operatorDelegator = _getRandomOperatorDelegator(operatorDelegatorIndex);
 
-        int256 podOwnerSharesBefore = eigenPodManager.podOwnerShares(address(operatorDelegator));
+        address pod = getPodForOwner(address(operatorDelegator));
 
-        // reduces the balance of the deposit contract by the max slashing penalty (1 ETH)
-        try ethPOSDepositMock.slash(1 ether) {} catch {
-            // @audit checking if failing is because deposit contract doesn't have any eth in it
-            // would imply that run is too short and depositQueue_stakeEthFromQueue hasn't successfully been called yet
-            // emit Debug(address(ethPOSDepositMock).balance);
-            // t(false, "call to ethPOSDepositMock.slash fails");
-        }
-
-        // update the OperatorDelegator's share balance in EL by calling EigenPodManager as the pod
-        address podAddress = address(eigenPodManager.getPod(address(operatorDelegator)));
-        vm.prank(podAddress);
-        eigenPodManager.recordBeaconChainETHBalanceUpdate(address(operatorDelegator), -1 ether);
-
-        int256 podOwnerSharesAfter = eigenPodManager.podOwnerShares(address(operatorDelegator));
-
-        // check that share allocation is properly decreased
-        require(podOwnerSharesAfter < podOwnerSharesBefore, "pod owner shares don't decrease");
+        vm.prank(pod); // need to prank as pod to call functions in EigenPodManager that modify accounting
+        slashNative(address(operatorDelegator));
     }
 
     /// @notice simulates and AVS slashing event on EigenLayer for native ETH and LSTs held by an OperatorDelegator
@@ -225,6 +210,9 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
         lastRebase = block.timestamp;
     }
 
+    /**
+        Deployment Using Fuzzer
+    */
     /// @notice deploys a collateral token with a corresponding strategy (in EigenLayer) and OperatorDelegator
     // NOTE: can add extra source of randomness by fuzzing the allocation parameters for OperatorDelegator
     function restakeManager_deployTokenStratOperatorDelegator() public {
@@ -428,6 +416,9 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
         activeOperatorDelegator.setTokenStrategy(collateralTokenToAdd, strategyToAdd);
     }
 
+    /**
+        Utils
+    */
     function _getRandomTokenStrategy(uint256 strategyIndex) internal returns (IStrategy strategy) {
         return deployedStrategies[strategyIndex % deployedStrategies.length];
     }

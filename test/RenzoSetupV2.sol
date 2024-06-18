@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.19;
 import { Test } from "forge-std/Test.sol";
-import { EigenLayerSetupV2 } from "eigenlayer/test/recon/EigenLayerSetupV2.sol";
+import { EigenLayerSystem } from "eigenlayer/test/recon/EigenLayerSystem.sol";
 import { vm } from "@chimera/Hevm.sol";
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import "test/helpers/ProxyAdmin.sol";
@@ -18,7 +18,7 @@ import "test/mocks/MockERC20.sol";
 import "test/mocks/MockAggregatorV3.sol";
 import "forge-std/console2.sol";
 
-contract RenzoSetupV2 is EigenLayerSetupV2 {
+contract RenzoSetupV2 is EigenLayerSystem {
     // EigenLayerSetup sets the admin address using this
     // address admin = address(this);
 
