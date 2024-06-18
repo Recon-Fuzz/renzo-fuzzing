@@ -68,13 +68,9 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
         restakeManager.deposit(collateralToken, amount, referralId);
     }
 
-    function restakeManager_depositETH() public payable {
-        // @audit adding in try/catch to see if this is reverting for some reason
-        try restakeManager.depositETH{ value: msg.value }() {
-            // t(false, "call to depositETH succeeds");
-        } catch {
-            // t(false, "call to depositETH fails");
-        }
+    function restakeManager_depositETH(uint256 amount) public payable {
+        amount = amount % address(this).balance;
+        restakeManager.depositETH{ value: amount };
     }
 
     function restakeManager_clamped_depositETH() public payable {
