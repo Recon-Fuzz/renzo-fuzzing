@@ -131,9 +131,7 @@ contract CryticToFoundryV2 is
         int256 podOwnerSharesBefore = eigenPodManager.podOwnerShares(operatorDelegator);
 
         // slash the validator for OperatorDelegator at index 0
-        // vm.startPrank(0x9D00906DA19ED95E15a67723B296813B49cC80c7);
-        restakeManager_slash_native(0);
-        // vm.stopPrank();
+        restakeManager_slash_native();
 
         uint256 depositContractBalanceAfter = address(ethPOSDepositMock).balance;
         int256 podOwnerSharesAfter = eigenPodManager.podOwnerShares(operatorDelegator);
@@ -170,7 +168,18 @@ contract CryticToFoundryV2 is
         depositQueue_stakeEthFromQueue(0, pubkey, signature, dataRoot);
 
         // SLASH
-        restakeManager_slash_AVS(32 ether, 10);
+        int256 podOwnerSharesBefore = eigenPodManager.podOwnerShares(
+            address(activeOperatorDelegator)
+        );
+        uint256 lstSharesBefore = activeStrategy.shares(address(activeOperatorDelegator));
+        restakeManager_slash_AVS(5 ether, 10);
+        int256 podOwnerSharesAfter = eigenPodManager.podOwnerShares(
+            address(activeOperatorDelegator)
+        );
+        uint256 lstSharesAfter = activeStrategy.shares(address(activeOperatorDelegator));
+
+        assertTrue(podOwnerSharesBefore > podOwnerSharesAfter, "pod owner shares don't decrease");
+        assertTrue(lstSharesBefore > lstSharesAfter, "lst shares don't decrease");
     }
 
     function test_LST_rebasing() public {

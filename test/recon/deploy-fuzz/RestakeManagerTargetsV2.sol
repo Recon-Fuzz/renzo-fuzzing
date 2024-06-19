@@ -45,7 +45,7 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
     // @audit setting this to false see if multiple deploy works
     bool immutable RECON_USE_SINGLE_DEPLOY = false;
     bool immutable RECON_USE_HARDCODED_DECIMALS = true;
-    address immutable TOKEN_BURN_ADDRESS = address(0x1);
+    // address immutable TOKEN_BURN_ADDRESS = address(0x1);
 
     event Debug(uint256 balance);
     event SenderBalance(uint256);
@@ -116,13 +116,10 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
     }
 
     /// @notice simulates a native slashing event on one of the validators that gets created by OperatorDelegator::stakeEth
-    function restakeManager_slash_native(uint256 operatorDelegatorIndex) public {
+    function restakeManager_slash_native() public {
         // OperatorDelegators are what make the call to deploy EigenPod and so are the owner of the created pod
-        IOperatorDelegator operatorDelegator = _getRandomOperatorDelegator(operatorDelegatorIndex);
+        IOperatorDelegator operatorDelegator = activeOperatorDelegator;
 
-        address pod = getPodForOwner(address(operatorDelegator));
-
-        vm.prank(pod); // need to prank as pod to call functions in EigenPodManager that modify accounting
         slashNative(address(operatorDelegator));
     }
 
@@ -131,46 +128,11 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
         // NOTE: Because current deployment setup only sets one collateral token for a given OperatorDelegator there are only two possible stakes that can be slashed (LST and native ETH),
         //       but if an OperatorDelegator has multiple strategies associated with it, this logic will have to be refactored to appropriately slash each.
         //       The slashings conducted are dependant on the shares the OperatorDelegator has in each
-        uint256 nativeEthShares = uint256(
-            eigenPodManager.podOwnerShares(address(activeOperatorDelegator))
-        );
-        uint256 lstShares = activeStrategy.shares(address(activeOperatorDelegator));
+        IOperatorDelegator operatorDelegator = activeOperatorDelegator;
+        address[] memory activeStrategies = new address[](1);
+        activeStrategies[0] = address(activeStrategy);
 
-        // Slash native ETH if OperatorDelegator has any staked in EigenLayer
-        if (nativeEthShares > 0) {
-            // user can be slashed a max amount of their entire stake
-            nativeSlashAmount = nativeSlashAmount % nativeEthShares;
-
-            // shares are 1:1 with ETH in EigenPod so can slash the share amount directly
-            ethPOSDepositMock.slash(nativeSlashAmount);
-
-            // update the OperatorDelegator's share balance in EL by calling EigenPodManager as the pod
-            address podAddress = address(eigenPodManager.getPod(address(activeOperatorDelegator)));
-            vm.prank(podAddress);
-            eigenPodManager.recordBeaconChainETHBalanceUpdate(
-                address(activeOperatorDelegator),
-                -int256(nativeSlashAmount)
-            );
-        }
-
-        // Slash LST if OperatorDelegator has any staked in EigenLayer
-        if (lstShares > 0) {
-            uint256 slashingAmountLSTShares = lstSlashAmount % lstShares;
-            // convert share amount to slash to collateral token
-            uint amountLSTToken = activeStrategy.sharesToUnderlyingView(slashingAmountLSTShares);
-
-            // burn tokens in strategy to ensure they don't effect accounting
-            vm.prank(address(activeStrategy));
-            IERC20(activeCollateralToken).transfer(TOKEN_BURN_ADDRESS, amountLSTToken);
-
-            // remove shares to update operatorDelegator's accounting
-            vm.prank(address(delegation));
-            _removeSharesFromStrategyManager(
-                address(activeOperatorDelegator),
-                address(activeStrategy),
-                slashingAmountLSTShares
-            );
-        }
+        slashAVS(address(operatorDelegator), activeStrategies, nativeSlashAmount, lstSlashAmount);
     }
 
     /// @notice simulates a discount in the price of an LST token in the system via the price returned by the oracle
