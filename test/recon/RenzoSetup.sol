@@ -1,9 +1,11 @@
-// SPDX-License-Identifier: BUSL-1.1
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
+
 import { Test } from "forge-std/Test.sol";
-import { EigenLayerSetup } from "eigenlayer/test/recon/EigenLayerSetup.sol";
+import { EigenLayerSystem } from "eigenlayer/test/recon/EigenLayerSystem.sol";
 import { vm } from "@chimera/Hevm.sol";
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+
 import "test/helpers/ProxyAdmin.sol";
 import "contracts/Permissions/RoleManager.sol";
 import "contracts/token/EzEthToken.sol";
@@ -18,7 +20,7 @@ import "test/mocks/MockERC20.sol";
 import "test/mocks/MockAggregatorV3.sol";
 import "forge-std/console2.sol";
 
-contract RenzoSetup is EigenLayerSetup {
+contract RenzoSetup is EigenLayerSystem {
     // EigenLayerSetup sets the admin address using this
     // address admin = address(this);
 
@@ -27,12 +29,10 @@ contract RenzoSetup is EigenLayerSetup {
     RoleManager internal roleManagerImplementation;
     EzEthToken internal ezETH;
     EzEthToken internal ezETHImplementation;
-    MockERC20 internal stETH;
-    MockERC20 internal cbETH;
     RenzoOracle internal renzoOracle;
     RenzoOracle internal renzoOracleImplementation;
     MockAggregatorV3 internal stEthPriceOracle;
-    MockAggregatorV3 internal cbEthPriceOracle;
+    MockAggregatorV3 internal wbEthPriceOracle;
     DepositQueue internal depositQueue;
     DepositQueue internal depositQueueImplementation;
     RestakeManager internal restakeManager;
@@ -41,17 +41,19 @@ contract RenzoSetup is EigenLayerSetup {
     WithdrawQueue internal withdrawQueueImplementation;
     RewardHandler internal rewardHandler;
     RewardHandler internal rewardHandlerImplementation;
+    OperatorDelegator internal operatorDelegatorImplementation;
+    OperatorDelegator[] internal operatorDelegators;
     OperatorDelegator internal operatorDelegator1;
     OperatorDelegator internal operatorDelegator2;
-    OperatorDelegator internal operatorDelegatorImplementation;
+    address[] internal collateralTokens;
 
-    address[] internal lstAddresses;
-    function deployRenzo(bool eigenLayerLocal) internal {
+    mapping(address => MockAggregatorV3) internal collateralTokenOracles;
+
+    function deployRenzo() internal {
         renzoProxyAdmin = new ProxyAdmin();
 
         // deploy RoleManager proxy
         roleManagerImplementation = new RoleManager();
-        // this wraps the proxy with the RoleManager interface
         roleManager = RoleManager(
             address(
                 new TransparentUpgradeableProxy(
@@ -69,6 +71,7 @@ contract RenzoSetup is EigenLayerSetup {
         roleManager.grantRole(roleManager.ORACLE_ADMIN(), admin);
         roleManager.grantRole(roleManager.RESTAKE_MANAGER_ADMIN(), admin);
         roleManager.grantRole(roleManager.ERC20_REWARD_ADMIN(), admin);
+        roleManager.grantRole(roleManager.WITHDRAW_QUEUE_ADMIN(), admin);
         roleManager.grantRole(roleManager.DEPOSIT_WITHDRAW_PAUSER(), admin);
 
         // deploy tokens
@@ -83,12 +86,6 @@ contract RenzoSetup is EigenLayerSetup {
             )
         );
         ezETH.initialize(roleManager);
-        stETH = new MockERC20("Staked ETH", "stETH", 18);
-        cbETH = new MockERC20("Coinbase ETH", "cbETH", 18);
-
-        // mint LSTs to the target contract
-        stETH.mint(address(this), 100_000);
-        cbETH.mint(address(this), 100_000);
 
         // deploy oracle, needs to be done as a proxy
         renzoOracleImplementation = new RenzoOracle();
@@ -103,6 +100,9 @@ contract RenzoSetup is EigenLayerSetup {
         );
         renzoOracle.initialize(roleManager);
 
+        // deploy the EigenLayer system
+        deployEigenLayerLocal();
+
         vm.warp(1524785992); // warps to echidna's initial start time
         stEthPriceOracle = new MockAggregatorV3(
             18, // decimals
@@ -112,37 +112,30 @@ contract RenzoSetup is EigenLayerSetup {
             block.timestamp, // startedAt
             block.timestamp // updatedAt
         );
-        cbEthPriceOracle = new MockAggregatorV3(
+        wbEthPriceOracle = new MockAggregatorV3(
             18,
-            "cbETH price oracle",
+            "wbETH price oracle",
             1,
             11e18 / 10,
             block.timestamp,
             block.timestamp
         );
 
-        (, int256 answer, uint256 startedAt, uint256 updatedAt, ) = stEthPriceOracle
-            .latestRoundData();
+        renzoOracle.setOracleAddress(
+            IERC20(address(stETH)),
+            AggregatorV3Interface(address(stEthPriceOracle))
+        );
+        renzoOracle.setOracleAddress(
+            IERC20(address(wbETH)),
+            AggregatorV3Interface(address(wbEthPriceOracle))
+        );
 
-        renzoOracle.setOracleAddress(stETH, AggregatorV3Interface(address(stEthPriceOracle)));
-        renzoOracle.setOracleAddress(cbETH, AggregatorV3Interface(address(cbEthPriceOracle)));
+        // mint tokens to test contract
+        stETH.mint(address(this), 10_000_000);
+        wbETH.mint(address(this), 10_000_000);
 
-        // deploy EigenLayer to be able to access StrategyManager and DelegationManager
-        lstAddresses.push(address(stETH));
-        lstAddresses.push(address(cbETH));
-
-        address[] memory strategyArray = new address[](2);
-        strategyArray[0] = address(0x54945180dB7943c0ed0FEE7EdaB2Bd24620256bc);
-        strategyArray[1] = address(0x93c4b944D05dfe6df7645A86cd2206016c51564D);
-
-        if (eigenLayerLocal) {
-            // this deploys EigenLayer strategies for the tokens passed in
-            deployEigenLayerLocal(lstAddresses);
-        } else {
-            // this takes in the strategies used by Renzo to expose their interfaces using EigenLayer contracts
-            // TODO: resolve array index out of bounds error when using this
-            deployEigenLayerForked(strategyArray);
-        }
+        collateralTokens.push(address(stETH));
+        collateralTokens.push(address(wbETH));
 
         // deploy DepositQueue
         depositQueueImplementation = new DepositQueue();
@@ -181,9 +174,8 @@ contract RenzoSetup is EigenLayerSetup {
             depositQueue
         );
 
-        // approve the RestakeManager to spend the target's tokens
         stETH.approve(address(restakeManager), type(uint256).max);
-        cbETH.approve(address(restakeManager), type(uint256).max);
+        wbETH.approve(address(restakeManager), type(uint256).max);
 
         // deploy WithdrawQueue
         withdrawQueueImplementation = new WithdrawQueue();
@@ -198,10 +190,12 @@ contract RenzoSetup is EigenLayerSetup {
                 )
             )
         );
+
+        // initializing this with an empty buffer array, tokens are added to withdrawBuffer in deployTokenStratOperatorDelegator
         WithdrawQueueStorageV1.TokenWithdrawBuffer[]
-            memory withdrawBuffer = new WithdrawQueueStorageV1.TokenWithdrawBuffer[](2);
-        withdrawBuffer[0] = WithdrawQueueStorageV1.TokenWithdrawBuffer(address(stETH), 10_000);
-        withdrawBuffer[1] = WithdrawQueueStorageV1.TokenWithdrawBuffer(address(cbETH), 10_000);
+            memory withdrawBuffer = new WithdrawQueueStorageV1.TokenWithdrawBuffer[](1);
+        // NOTE: adding ezETH to withdraw buffer array because it can't be used for initialization if array is empty
+        withdrawBuffer[0] = WithdrawQueueStorageV1.TokenWithdrawBuffer(address(ezETH), 10_000);
 
         withdrawQueue.initialize(
             roleManager,
@@ -234,7 +228,6 @@ contract RenzoSetup is EigenLayerSetup {
         );
         rewardHandler.initialize(roleManager, address(depositQueue));
 
-        // @audit stopped here
         // deploy OperatorDelegators
         operatorDelegatorImplementation = new OperatorDelegator();
         operatorDelegator1 = OperatorDelegator(
@@ -281,7 +274,7 @@ contract RenzoSetup is EigenLayerSetup {
             IStrategy(address(deployedStrategyArray[0]))
         );
         operatorDelegator1.setTokenStrategy(
-            IERC20(address(cbETH)),
+            IERC20(address(wbETH)),
             IStrategy(address(deployedStrategyArray[1]))
         );
         operatorDelegator2.setTokenStrategy(
@@ -289,9 +282,11 @@ contract RenzoSetup is EigenLayerSetup {
             IStrategy(address(deployedStrategyArray[0]))
         );
         operatorDelegator2.setTokenStrategy(
-            IERC20(address(cbETH)),
+            IERC20(address(wbETH)),
             IStrategy(address(deployedStrategyArray[1]))
         );
+        operatorDelegators.push(operatorDelegator1);
+        operatorDelegators.push(operatorDelegator2);
 
         // add operator delegators to RestakeManager
         restakeManager.addOperatorDelegator(
@@ -305,22 +300,17 @@ contract RenzoSetup is EigenLayerSetup {
 
         // add the collateral tokens to the restake manager
         restakeManager.addCollateralToken(IERC20(address(stETH)));
-        restakeManager.addCollateralToken(IERC20(address(cbETH)));
+        restakeManager.addCollateralToken(IERC20(address(wbETH)));
     }
 
+    /** Utils **/
     function _getRandomDepositableToken(uint256 tokenIndex) internal view returns (address) {
-        return lstAddresses[tokenIndex % lstAddresses.length];
+        return collateralTokens[tokenIndex % collateralTokens.length];
     }
 
     function _getRandomOperatorDelegator(
         uint256 operatorDelegatorIndex
     ) internal view returns (IOperatorDelegator operatorDelegator) {
-        IOperatorDelegator[] memory operatorDelegatorArray = new IOperatorDelegator[](
-            restakeManager.getOperatorDelegatorsLength()
-        );
-        operatorDelegatorArray[0] = operatorDelegator1;
-        operatorDelegatorArray[1] = operatorDelegator2;
-
-        return operatorDelegatorArray[operatorDelegatorIndex % operatorDelegatorArray.length];
+        return operatorDelegators[operatorDelegatorIndex % operatorDelegators.length];
     }
 }
