@@ -12,22 +12,22 @@ import { console2 } from "forge-std/console2.sol";
 
 import { OperatorDelegator } from "contracts/Delegation/OperatorDelegator.sol";
 import { IOperatorDelegator } from "../../../contracts/Delegation/IOperatorDelegator.sol";
-import { DepositQueueTargetsV2 } from "./DepositQueueTargetsV2.sol";
+import { DepositQueueTargets } from "./DepositQueueTargets.sol";
 import { IStrategy } from "contracts/EigenLayer/interfaces/IStrategy.sol";
 import {
     IDelegationManager
 } from "../../../contracts/EigenLayer/interfaces/IDelegationManager.sol";
 import { IEigenPodManager } from "../../../contracts/EigenLayer/interfaces/IEigenPodManager.sol";
 import { IStrategyManager } from "../../../contracts/EigenLayer/interfaces/IStrategyManager.sol";
-import { MockERC20 } from "../../mocks/MockERC20.sol";
+import { MockERC20 } from "../mocks/MockERC20.sol";
 import { StrategyBaseTVLLimits } from "eigenlayer/contracts/strategies/StrategyBaseTVLLimits.sol";
 import { WithdrawQueue } from "contracts/Withdraw/WithdrawQueue.sol";
 import { WithdrawQueueStorageV1 } from "contracts/Withdraw/WithdrawQueueStorage.sol";
-import { SetupV2 } from "./SetupV2.sol";
-import "../../mocks/MockAggregatorV3.sol";
+import { Setup } from "./Setup.sol";
+import "../mocks/MockAggregatorV3.sol";
 
 // TODO: include setPrice for aggregator in different contract
-abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
+abstract contract RestakeManagerTargets is BaseTargetFunctions, Setup {
     using Strings for uint256;
 
     bool internal singleDeployed;

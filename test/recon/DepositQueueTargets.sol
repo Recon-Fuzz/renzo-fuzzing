@@ -6,10 +6,10 @@ import { BaseTargetFunctions } from "@chimera/BaseTargetFunctions.sol";
 import { vm } from "@chimera/Hevm.sol";
 import { console2 } from "forge-std/console2.sol";
 
-import { SetupV2 } from "./SetupV2.sol";
+import { Setup } from "./Setup.sol";
 import { IOperatorDelegator } from "../../../contracts/Delegation/IOperatorDelegator.sol";
 
-abstract contract DepositQueueTargetsV2 is BaseTargetFunctions, SetupV2 {
+abstract contract DepositQueueTargets is BaseTargetFunctions, Setup {
     /// @notice this is a privileged function that's called by an ERC20RewardsAdmin admin to sweep ERC20 rewards tokens into RestakeManager
     function depositQueue_depositTokenRewardsFromProtocol(uint256 tokenIndex) public {
         address tokenToDeposit = _getRandomDepositableToken(tokenIndex);

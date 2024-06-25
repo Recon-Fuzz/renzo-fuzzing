@@ -20,7 +20,7 @@ import "test/mocks/MockERC20.sol";
 import "test/mocks/MockAggregatorV3.sol";
 import "forge-std/console2.sol";
 
-contract RenzoSetupV2 is EigenLayerSystem {
+contract RenzoSetup is EigenLayerSystem {
     // EigenLayerSetup sets the admin address using this
     // address admin = address(this);
 

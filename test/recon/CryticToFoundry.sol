@@ -1,19 +1,20 @@
 // SPDX-License-Identifier: GPL-2.0
 pragma solidity ^0.8.0;
 
+import { FoundryAsserts } from "@chimera/FoundryAsserts.sol";
 import { Test } from "forge-std/Test.sol";
 import { console2 } from "forge-std/console2.sol";
-import { RestakeManagerTargetsV2 } from "./RestakeManagerTargetsV2.sol";
-import { RestakeManagerAdminTargetsV2 } from "./RestakeManagerAdminTargetsV2.sol";
-import { DepositQueueTargetsV2 } from "./DepositQueueTargetsV2.sol";
-import { FoundryAsserts } from "@chimera/FoundryAsserts.sol";
-import "../../mocks/MockAggregatorV3.sol";
 
-contract CryticToFoundryV2 is
+import { RestakeManagerTargets } from "./RestakeManagerTargets.sol";
+import { RestakeManagerAdminTargets } from "./RestakeManagerAdminTargets.sol";
+import { DepositQueueTargets } from "./DepositQueueTargets.sol";
+import "../mocks/MockAggregatorV3.sol";
+
+contract CryticToFoundry is
     Test,
-    RestakeManagerTargetsV2,
-    RestakeManagerAdminTargetsV2,
-    DepositQueueTargetsV2,
+    RestakeManagerTargets,
+    RestakeManagerAdminTargets,
+    DepositQueueTargets,
     FoundryAsserts
 {
     function setUp() public {
