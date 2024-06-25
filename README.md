@@ -4,7 +4,7 @@ Fuzzing harness provided by Recon, located in test/recon. Learn more about the s
 
 ### System Setup
 
-This suite integrates a full local deployment of the EigenLayer system with a fuzzing scaffolding of the Renzo system to test invariants defined for Renzo.
+This suite integrates a full local deployment of the EigenLayer system (provided by this [repo](https://github.com/nican0r/eigenlayer-fuzzing/tree/main))with a fuzzing scaffolding of the Renzo system to test invariants defined for Renzo.
 
 The EigenLayer system is added as a dependency in the eigenlayer-fuzzing submodule. 
 
