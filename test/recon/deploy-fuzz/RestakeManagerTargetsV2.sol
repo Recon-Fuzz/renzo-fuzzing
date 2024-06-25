@@ -52,6 +52,7 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
 
     function restakeManager_deposit(uint256 tokenIndex, uint256 amount) public {
         IERC20 collateralToken = IERC20(_getRandomDepositableToken(tokenIndex));
+
         amount = amount % IERC20(collateralToken).balanceOf(address(this));
 
         restakeManager.deposit(collateralToken, amount);
@@ -116,23 +117,21 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
     }
 
     /// @notice simulates a native slashing event on one of the validators that gets created by OperatorDelegator::stakeEth
-    function restakeManager_slash_native() public {
-        // OperatorDelegators are what make the call to deploy EigenPod and so are the owner of the created pod
-        IOperatorDelegator operatorDelegator = activeOperatorDelegator;
+    function restakeManager_slash_native(uint256 operatorDelegatorIndex) public {
+        IOperatorDelegator operatorDelegator = _getRandomOperatorDelegator(operatorDelegatorIndex);
 
         slashNative(address(operatorDelegator));
     }
 
     /// @notice simulates and AVS slashing event on EigenLayer for native ETH and LSTs held by an OperatorDelegator
-    function restakeManager_slash_AVS(uint256 nativeSlashAmount, uint256 lstSlashAmount) public {
-        // NOTE: Because current deployment setup only sets one collateral token for a given OperatorDelegator there are only two possible stakes that can be slashed (LST and native ETH),
-        //       but if an OperatorDelegator has multiple strategies associated with it, this logic will have to be refactored to appropriately slash each.
-        //       The slashings conducted are dependant on the shares the OperatorDelegator has in each
-        IOperatorDelegator operatorDelegator = activeOperatorDelegator;
-        address[] memory activeStrategies = new address[](1);
-        activeStrategies[0] = address(activeStrategy);
+    function restakeManager_slash_AVS(
+        uint256 operatorDelegatorIndex,
+        uint256 nativeSlashAmount,
+        uint256 lstSlashAmount
+    ) public {
+        IOperatorDelegator operatorDelegator = _getRandomOperatorDelegator(operatorDelegatorIndex);
 
-        slashAVS(address(operatorDelegator), activeStrategies, nativeSlashAmount, lstSlashAmount);
+        slashAVS(address(operatorDelegator), nativeSlashAmount, lstSlashAmount);
     }
 
     /// @notice simulates a discount in the price of an LST token in the system via the price returned by the oracle
@@ -170,218 +169,5 @@ abstract contract RestakeManagerTargetsV2 is BaseTargetFunctions, SetupV2 {
 
         // set new last rebase time
         lastRebase = block.timestamp;
-    }
-
-    /**
-        Deployment Using Fuzzer
-    */
-    /// @notice deploys a collateral token with a corresponding strategy (in EigenLayer) and OperatorDelegator
-    // NOTE: can add extra source of randomness by fuzzing the allocation parameters for OperatorDelegator
-    function restakeManager_deployTokenStratOperatorDelegator() public {
-        // NOTE: TEMPORARY
-        require(!singleDeployed); // This bricks the function for Medusa
-        // if singleDeployed, this deploys one token, one strategy, one Operator
-
-        if (RECON_USE_SINGLE_DEPLOY) {
-            singleDeployed = true;
-        }
-
-        if (RECON_USE_HARDCODED_DECIMALS) {
-            decimals = 18;
-        }
-
-        initialMintPerUsers = 1_000_000e18;
-
-        // deploy collateral token
-        {
-            // concatenate length of token array for token name and symbol
-            string memory tokenNumber = (collateralTokens.length + 1).toString();
-            string memory tokenName = string(abi.encodePacked("Collateral Token ", tokenNumber));
-            string memory tokenSymbol = string(abi.encodePacked("CT", tokenNumber));
-
-            collateralTokens.push(new MockERC20(tokenName, tokenSymbol, decimals));
-            collateralTokens[collateralTokens.length - 1].mint(address(this), initialMintPerUsers);
-            collateralTokens[collateralTokens.length - 1].approve(
-                address(restakeManager),
-                type(uint256).max
-            );
-        }
-
-        uint256 collateralTokenslength = collateralTokens.length;
-
-        // deploy collateral token oracle
-        {
-            vm.warp(1524785992); // warps to echidna's initial start time
-            MockERC20 collateralTokenForOracle = collateralTokens[collateralTokenslength - 1];
-            MockAggregatorV3 oracleForCollateralToken = new MockAggregatorV3(
-                18, // decimals
-                "CT1 price oracle", // description
-                1, // version
-                1e18, // answer
-                block.timestamp, // startedAt
-                block.timestamp // updatedAt
-            );
-
-            collateralTokenOracles[address(collateralTokenForOracle)] = oracleForCollateralToken;
-
-            renzoOracle.setOracleAddress(
-                collateralTokenForOracle,
-                AggregatorV3Interface(address(oracleForCollateralToken))
-            );
-        }
-
-        // console2.log(
-        //     "oracle from mapping: ",
-        //     address(collateralTokenOracles[address(collateralTokens[collateralTokenslength - 1])])
-        // );
-
-        // deploy EigenLayer strategy for token
-        {
-            // NOTE: this can be refactored into an function in EigenLayer setup that handles this to keep things properly separated
-            baseStrategyImplementation = new StrategyBaseTVLLimits(strategyManager);
-
-            deployedStrategies.push(
-                IStrategy(
-                    address(
-                        StrategyBaseTVLLimits(
-                            address(
-                                new TransparentUpgradeableProxy(
-                                    address(baseStrategyImplementation),
-                                    address(eigenLayerProxyAdmin),
-                                    abi.encodeWithSelector(
-                                        StrategyBaseTVLLimits.initialize.selector,
-                                        // NOTE: fuzzing these next two input values could allow better evaluation of possible combinations due to TVL limits
-                                        type(uint256).max,
-                                        type(uint256).max,
-                                        IERC20(collateralTokens[collateralTokenslength - 1]),
-                                        eigenLayerPauserReg
-                                    )
-                                )
-                            )
-                        )
-                    )
-                )
-            );
-        }
-
-        // set the strategy whitelist in strategyManager
-        // NOTE: toggling third party transfers could be a good target for fuzzing
-
-        // only need to add one strategy at a time
-        bool[] memory thirdPartyTransfers = new bool[](1); // default to allowing third party transfers
-        address[] memory deployedStrategiesTemp = new address[](1);
-
-        // adds the most recently deployed strategy to the array that is used to set strategies in StrategyManager
-        deployedStrategiesTemp[0] = address(deployedStrategies[deployedStrategies.length - 1]);
-        _addStrategiesToDepositWhitelist(deployedStrategiesTemp, thirdPartyTransfers);
-
-        IStrategy addedStrategy = deployedStrategies[deployedStrategies.length - 1];
-
-        // NOTE: this logic might make more sense to have in switcher because the token shouldn't be added to the renzo system here
-        // set collateral token in WithdrawQueue
-        {
-            // withdrawBuffer only needs length 1 because updating single asset and target in each deploy
-            WithdrawQueueStorageV1.TokenWithdrawBuffer[]
-                memory withdrawBuffer = new WithdrawQueueStorageV1.TokenWithdrawBuffer[](1);
-
-            withdrawBuffer[0] = WithdrawQueueStorageV1.TokenWithdrawBuffer(
-                address(collateralTokens[collateralTokenslength - 1]),
-                initialBufferTarget
-            );
-
-            // initialize the withdrawQueue with new withdrawBuffer
-            withdrawQueue.updateWithdrawBufferTarget(withdrawBuffer);
-            // console2.log(
-            //     "buffer target for collateral asset: ",
-            //     withdrawQueue.withdrawalBufferTarget(address(collateralTokens[0]))
-            // );
-        }
-
-        // Deploy OperatorDelegator and set the token strategy for it
-        {
-            operatorDelegatorImplementation = new OperatorDelegator();
-
-            operatorDelegators.push(
-                OperatorDelegator(
-                    payable(
-                        address(
-                            new TransparentUpgradeableProxy(
-                                address(operatorDelegatorImplementation),
-                                address(renzoProxyAdmin),
-                                abi.encodeWithSelector(
-                                    OperatorDelegator.initialize.selector,
-                                    roleManager,
-                                    IStrategyManager(address(strategyManager)),
-                                    restakeManager,
-                                    IDelegationManager(address(delegation)),
-                                    IEigenPodManager(address(eigenPodManager))
-                                )
-                            )
-                        )
-                    )
-                )
-            );
-
-            // console2.log("ODs length: ", operatorDelegators.length);
-        }
-
-        // If this is the first deploy, use the switcher to set OperatorDelegator and CollateralToken
-        if (!hasDoneADeploy) {
-            restakeManager_switchTokenAndDelegator(0, 0);
-            hasDoneADeploy = true;
-        }
-    }
-
-    /// @notice switches the active token and OperatorDelegator in the system
-    function restakeManager_switchTokenAndDelegator(
-        uint256 operatorDelegatorIndex,
-        // uint256 collateralTokenIndex
-        uint256 tokenStrategyIndex
-    ) public {
-        // NOTE: could fuzz operatorDelegatorAllocation for more randomness
-        uint256 operatorDelegatorAllocation = 10_000; // 10,000 BP because only using one active OperatorDelegator at a time
-
-        // Add OperatorDelegator and collateral token to RestakeManager
-        // NOTE: only remove existing OperatorDelegator and CollateralToken if they've been previously set (not first deployment)
-        if (
-            restakeManager.getOperatorDelegatorsLength() != 0 &&
-            restakeManager.getCollateralTokensLength() != 0
-        ) {
-            // NOTE: this assumes there is only ever one OperatorDelegator in the array, if this isn't true, this logic will be incorrect
-            IOperatorDelegator operatorDelegatorToRemove = restakeManager.operatorDelegators(0);
-            // remove previously set OperatorDelegator
-            restakeManager.removeOperatorDelegator(operatorDelegatorToRemove);
-            // remove previously set collateral token
-            IERC20 collateralTokenToRemove = restakeManager.collateralTokens(0);
-            restakeManager.removeCollateralToken(collateralTokenToRemove);
-        }
-
-        // adds random OperatorDelegator to RestakeManager
-        IOperatorDelegator operatorDelegatorToAdd = _getRandomOperatorDelegator(
-            operatorDelegatorIndex
-        );
-        restakeManager.addOperatorDelegator(operatorDelegatorToAdd, operatorDelegatorAllocation);
-
-        // fetches random token strategy and corresponding collateralToken
-        IStrategy strategyToAdd = _getRandomTokenStrategy(tokenStrategyIndex);
-        IERC20 collateralTokenToAdd = strategyToAdd.underlyingToken();
-
-        // adds random collateral token to the restake manager
-        restakeManager.addCollateralToken(collateralTokenToAdd);
-
-        // sets the currently active collateral token and OperatorDelegator for access in tests
-        activeOperatorDelegator = OperatorDelegator(payable(address(operatorDelegatorToAdd)));
-        activeCollateralToken = MockERC20(address(collateralTokenToAdd));
-        activeStrategy = strategyToAdd;
-
-        // set token strategy in the OperatorDelegator
-        activeOperatorDelegator.setTokenStrategy(collateralTokenToAdd, strategyToAdd);
-    }
-
-    /**
-        Utils
-    */
-    function _getRandomTokenStrategy(uint256 strategyIndex) internal returns (IStrategy strategy) {
-        return deployedStrategies[strategyIndex % deployedStrategies.length];
     }
 }

@@ -1,9 +1,11 @@
-// SPDX-License-Identifier: BUSL-1.1
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.19;
+
 import { Test } from "forge-std/Test.sol";
 import { EigenLayerSystem } from "eigenlayer/test/recon/EigenLayerSystem.sol";
 import { vm } from "@chimera/Hevm.sol";
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+
 import "test/helpers/ProxyAdmin.sol";
 import "contracts/Permissions/RoleManager.sol";
 import "contracts/token/EzEthToken.sol";
@@ -29,6 +31,8 @@ contract RenzoSetupV2 is EigenLayerSystem {
     EzEthToken internal ezETHImplementation;
     RenzoOracle internal renzoOracle;
     RenzoOracle internal renzoOracleImplementation;
+    MockAggregatorV3 internal stEthPriceOracle;
+    MockAggregatorV3 internal wbEthPriceOracle;
     DepositQueue internal depositQueue;
     DepositQueue internal depositQueueImplementation;
     RestakeManager internal restakeManager;
@@ -39,19 +43,17 @@ contract RenzoSetupV2 is EigenLayerSystem {
     RewardHandler internal rewardHandlerImplementation;
     OperatorDelegator internal operatorDelegatorImplementation;
     OperatorDelegator[] internal operatorDelegators;
-    MockERC20[] internal collateralTokens;
+    OperatorDelegator internal operatorDelegator1;
+    OperatorDelegator internal operatorDelegator2;
+    address[] internal collateralTokens;
 
     mapping(address => MockAggregatorV3) internal collateralTokenOracles;
 
-    /// @notice deploys the Renzo system based on their hardhat script
-    /// @dev this doesn't deploy collateral tokens or OperatorDelegators as these deployments are handled by restakeManager_deployTokenStratOperatorDelegator
-    /// @param eigenLayerLocal determines whether the EigenLayer system is deployed locally or in a forked environment
-    function deployRenzo(bool eigenLayerLocal) internal {
+    function deployRenzo() internal {
         renzoProxyAdmin = new ProxyAdmin();
 
         // deploy RoleManager proxy
         roleManagerImplementation = new RoleManager();
-        // this wraps the proxy with the RoleManager interface
         roleManager = RoleManager(
             address(
                 new TransparentUpgradeableProxy(
@@ -98,18 +100,42 @@ contract RenzoSetupV2 is EigenLayerSystem {
         );
         renzoOracle.initialize(roleManager);
 
-        address[] memory strategyArray = new address[](2);
-        strategyArray[0] = address(0x54945180dB7943c0ed0FEE7EdaB2Bd24620256bc);
-        strategyArray[1] = address(0x93c4b944D05dfe6df7645A86cd2206016c51564D);
+        // deploy the EigenLayer system
+        deployEigenLayerLocal();
 
-        if (eigenLayerLocal) {
-            // NOTE: modified in V2 to take no tokens as input, strategies instead are deployed by fuzzer
-            deployEigenLayerLocal();
-        } else {
-            // this takes in the strategies used by Renzo to expose their interfaces using EigenLayer contracts
-            // TODO: resolve array index out of bounds error when using this
-            deployEigenLayerForked(strategyArray);
-        }
+        vm.warp(1524785992); // warps to echidna's initial start time
+        stEthPriceOracle = new MockAggregatorV3(
+            18, // decimals
+            "stETH price oracle", // description
+            1, // version
+            1e18, // answer
+            block.timestamp, // startedAt
+            block.timestamp // updatedAt
+        );
+        wbEthPriceOracle = new MockAggregatorV3(
+            18,
+            "wbETH price oracle",
+            1,
+            11e18 / 10,
+            block.timestamp,
+            block.timestamp
+        );
+
+        renzoOracle.setOracleAddress(
+            IERC20(address(stETH)),
+            AggregatorV3Interface(address(stEthPriceOracle))
+        );
+        renzoOracle.setOracleAddress(
+            IERC20(address(wbETH)),
+            AggregatorV3Interface(address(wbEthPriceOracle))
+        );
+
+        // mint tokens to test contract
+        stETH.mint(address(this), 10_000_000);
+        wbETH.mint(address(this), 10_000_000);
+
+        collateralTokens.push(address(stETH));
+        collateralTokens.push(address(wbETH));
 
         // deploy DepositQueue
         depositQueueImplementation = new DepositQueue();
@@ -147,6 +173,9 @@ contract RenzoSetupV2 is EigenLayerSystem {
             IDelegationManager(address(delegation)),
             depositQueue
         );
+
+        stETH.approve(address(restakeManager), type(uint256).max);
+        wbETH.approve(address(restakeManager), type(uint256).max);
 
         // deploy WithdrawQueue
         withdrawQueueImplementation = new WithdrawQueue();
@@ -198,11 +227,85 @@ contract RenzoSetupV2 is EigenLayerSystem {
             )
         );
         rewardHandler.initialize(roleManager, address(depositQueue));
+
+        // deploy OperatorDelegators
+        operatorDelegatorImplementation = new OperatorDelegator();
+        operatorDelegator1 = OperatorDelegator(
+            payable(
+                address(
+                    new TransparentUpgradeableProxy(
+                        address(operatorDelegatorImplementation),
+                        address(renzoProxyAdmin),
+                        ""
+                    )
+                )
+            )
+        );
+        operatorDelegator1.initialize(
+            roleManager,
+            IStrategyManager(address(strategyManager)),
+            restakeManager,
+            IDelegationManager(address(delegation)),
+            IEigenPodManager(address(eigenPodManager))
+        );
+
+        operatorDelegator2 = OperatorDelegator(
+            payable(
+                address(
+                    new TransparentUpgradeableProxy(
+                        address(operatorDelegatorImplementation),
+                        address(renzoProxyAdmin),
+                        ""
+                    )
+                )
+            )
+        );
+        operatorDelegator2.initialize(
+            roleManager,
+            IStrategyManager(address(strategyManager)),
+            restakeManager,
+            IDelegationManager(address(delegation)),
+            IEigenPodManager(address(eigenPodManager))
+        );
+
+        // set token strategies on OperatorDelegators
+        operatorDelegator1.setTokenStrategy(
+            IERC20(address(stETH)),
+            IStrategy(address(deployedStrategyArray[0]))
+        );
+        operatorDelegator1.setTokenStrategy(
+            IERC20(address(wbETH)),
+            IStrategy(address(deployedStrategyArray[1]))
+        );
+        operatorDelegator2.setTokenStrategy(
+            IERC20(address(stETH)),
+            IStrategy(address(deployedStrategyArray[0]))
+        );
+        operatorDelegator2.setTokenStrategy(
+            IERC20(address(wbETH)),
+            IStrategy(address(deployedStrategyArray[1]))
+        );
+        operatorDelegators.push(operatorDelegator1);
+        operatorDelegators.push(operatorDelegator2);
+
+        // add operator delegators to RestakeManager
+        restakeManager.addOperatorDelegator(
+            IOperatorDelegator(address(operatorDelegator1)),
+            7000 // 70% to operator 1
+        );
+        restakeManager.addOperatorDelegator(
+            IOperatorDelegator(address(operatorDelegator2)),
+            3000 // 30% to operator 2
+        );
+
+        // add the collateral tokens to the restake manager
+        restakeManager.addCollateralToken(IERC20(address(stETH)));
+        restakeManager.addCollateralToken(IERC20(address(wbETH)));
     }
 
     /** Utils **/
     function _getRandomDepositableToken(uint256 tokenIndex) internal view returns (address) {
-        return address(collateralTokens[tokenIndex % collateralTokens.length]);
+        return collateralTokens[tokenIndex % collateralTokens.length];
     }
 
     function _getRandomOperatorDelegator(
