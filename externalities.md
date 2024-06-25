@@ -3,10 +3,10 @@
 ### Native ETH Slashing
 Replicating this by burning the ETH associated with a validator in the `ETHDepositMock` contract by introducing a `slash` function (takes in a given amount to slash and burns the corresponding ETH in the contract to the 0 address) and updating the `EigenPodManager` accounting for the `OperatorDelegator` that staked the ETH.  
 
-This is implemented in `RestakManagerTagetsV2::restakeManager_slash_native`. 
+This is implemented in `RestakManagerTargets::restakeManager_slash_native`. 
 
 ### AVS Slashing
-AVS slashing hasn't been implemented in EigenLayer yet so the implementation defined in `RestakManagerTagetsV2::restakeManager_slash_AVS` is an interpretation of what the EigenLayer `Slasher` may eventually implement by inferring how the `recordStakeUpdate` defined in the [current `Slasher` interface](https://github.com/Layr-Labs/eigenlayer-contracts/blob/f3aa0efc2be0013b5002444b74ef7413e1779f59/src/contracts/core/Slasher.sol#L47) may behave. 
+AVS slashing hasn't been implemented in EigenLayer yet so the implementation defined in `RestakManagerTagets::restakeManager_slash_AVS` is an interpretation of what the EigenLayer `Slasher` may eventually implement by inferring how the `recordStakeUpdate` defined in the [current `Slasher` interface](https://github.com/Layr-Labs/eigenlayer-contracts/blob/f3aa0efc2be0013b5002444b74ef7413e1779f59/src/contracts/core/Slasher.sol#L47) may behave. 
 
 The primary mechanism of implemented function is to reduce a percentage of an OperatorDelegator's stake (representing their slashed amount) by burning it and updating their accounting in `EigenPodManager` (native ETH) or `StrategyManager` (LST tokens) to reflect this burnt amount. 
 
