@@ -26,7 +26,6 @@ import { WithdrawQueueStorageV1 } from "contracts/Withdraw/WithdrawQueueStorage.
 import { Setup } from "./Setup.sol";
 import "../mocks/MockAggregatorV3.sol";
 
-// TODO: include setPrice for aggregator in different contract
 abstract contract RestakeManagerTargets is BaseTargetFunctions, Setup {
     using Strings for uint256;
 
@@ -40,12 +39,6 @@ abstract contract RestakeManagerTargets is BaseTargetFunctions, Setup {
     OperatorDelegator internal activeOperatorDelegator;
     IStrategy internal activeStrategy;
     IStrategy[] internal deployedStrategies;
-
-    // bool immutable RECON_USE_SINGLE_DEPLOY = true;
-    // @audit setting this to false see if multiple deploy works
-    bool immutable RECON_USE_SINGLE_DEPLOY = false;
-    bool immutable RECON_USE_HARDCODED_DECIMALS = true;
-    // address immutable TOKEN_BURN_ADDRESS = address(0x1);
 
     event Debug(uint256 balance);
     event SenderBalance(uint256);
@@ -92,7 +85,7 @@ abstract contract RestakeManagerTargets is BaseTargetFunctions, Setup {
         External System Manipulation - see externalities file for more explanation on these
     */
 
-    // NOTE: danger, this allows the fuzzer to fill the buffer but may have unintended side-effects for overall system behavior
+    /// @dev this allows the fuzzer to fill the buffer but may have unintended side-effects for overall system behavior
     function restakeManager_fillBuffer(uint256 collateralTokenIndex) public {
         address collateralToken = _getRandomDepositableToken(collateralTokenIndex);
 
@@ -135,12 +128,11 @@ abstract contract RestakeManagerTargets is BaseTargetFunctions, Setup {
     }
 
     /// @notice simulates a discount in the price of an LST token in the system via the price returned by the oracle
-    function restakeManager_LST_discount(int256 discount) public {
-        // get the oracle for the active collateral token and set the price on it
-        MockAggregatorV3 activeTokenOracle = collateralTokenOracles[address(activeCollateralToken)];
+    function restakeManager_LST_discount(address collateralToken, int256 discount) public {
+        MockAggregatorV3 collateralTokenOracle = collateralTokenOracles[collateralToken];
 
         // apply discount to current price
-        (, int256 currentPrice, , , ) = activeTokenOracle.latestRoundData();
+        (, int256 currentPrice, , , ) = collateralTokenOracle.latestRoundData();
 
         // clamp discount up to the current price, allows price to go to a minimum of 0
         discount = discount % currentPrice;
@@ -148,24 +140,24 @@ abstract contract RestakeManagerTargets is BaseTargetFunctions, Setup {
         int256 discountedPrice = currentPrice - discount;
 
         // set new price in oracle
-        activeTokenOracle.setPrice(discountedPrice);
+        collateralTokenOracle.setPrice(discountedPrice);
     }
 
     /// @notice simulates a rebase of an LST token as a corresponding increase in the price of the LST token relative to ezETH
     /// @dev see shared_LST_interface for a more detailed description of the design decisions
-    function restakeManager_LST_rebase(int256 rebasedPrice) public {
+    function restakeManager_LST_rebase(address collateralToken, int256 rebasedPrice) public {
         // check that the last rebase was > 24 hours ago because rebases only happen once daily when beacon chain ether balance is updated
         require(block.timestamp >= lastRebase + 24 hours);
 
         // get the oracle for the active collateral token and set the price on it
-        MockAggregatorV3 activeTokenOracle = collateralTokenOracles[address(activeCollateralToken)];
+        MockAggregatorV3 collateralTokenOracle = collateralTokenOracles[collateralToken];
 
         // increase the price in the exchange rate of the oracle to reflect the rebase event
-        (, int256 currentPrice, , , ) = activeTokenOracle.latestRoundData();
+        (, int256 currentPrice, , , ) = collateralTokenOracle.latestRoundData();
         require(rebasedPrice > currentPrice); // rebase increases price, decrease in price would be handled by the restakeManager_LST_discount function
 
         // set new price in oracle
-        activeTokenOracle.setPrice(rebasedPrice);
+        collateralTokenOracle.setPrice(rebasedPrice);
 
         // set new last rebase time
         lastRebase = block.timestamp;
