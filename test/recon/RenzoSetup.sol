@@ -21,9 +21,6 @@ import "test/mocks/MockAggregatorV3.sol";
 import "forge-std/console2.sol";
 
 contract RenzoSetup is EigenLayerSystem {
-    // EigenLayerSetup sets the admin address using this
-    // address admin = address(this);
-
     ProxyAdmin internal renzoProxyAdmin;
     RoleManager internal roleManager;
     RoleManager internal roleManagerImplementation;
@@ -74,7 +71,7 @@ contract RenzoSetup is EigenLayerSystem {
         roleManager.grantRole(roleManager.WITHDRAW_QUEUE_ADMIN(), admin);
         roleManager.grantRole(roleManager.DEPOSIT_WITHDRAW_PAUSER(), admin);
 
-        // deploy tokens
+        // deploy ezETH token
         ezETHImplementation = new EzEthToken();
         ezETH = EzEthToken(
             address(
@@ -100,9 +97,6 @@ contract RenzoSetup is EigenLayerSystem {
         );
         renzoOracle.initialize(roleManager);
 
-        // deploy the EigenLayer system
-        deployEigenLayerLocal();
-
         vm.warp(1524785992); // warps to echidna's initial start time
         stEthPriceOracle = new MockAggregatorV3(
             18, // decimals
@@ -120,6 +114,8 @@ contract RenzoSetup is EigenLayerSystem {
             block.timestamp,
             block.timestamp
         );
+        collateralTokenOracles[address(stETH)] = stEthPriceOracle;
+        collateralTokenOracles[address(wbETH)] = wbEthPriceOracle;
 
         renzoOracle.setOracleAddress(
             IERC20(address(stETH)),

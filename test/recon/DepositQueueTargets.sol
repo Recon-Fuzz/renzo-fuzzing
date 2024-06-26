@@ -14,7 +14,6 @@ abstract contract DepositQueueTargets is BaseTargetFunctions, Setup {
     function depositQueue_depositTokenRewardsFromProtocol(uint256 tokenIndex) public {
         address tokenToDeposit = _getRandomDepositableToken(tokenIndex);
 
-        // the call in depositQueue makes a call to depositTokenRewardsFromProtocol
         depositQueue.sweepERC20(IERC20(tokenToDeposit));
     }
 
@@ -27,17 +26,15 @@ abstract contract DepositQueueTargets is BaseTargetFunctions, Setup {
     ) public {
         IOperatorDelegator operatorDelegator = _getRandomOperatorDelegator(operatorDelegatorIndex);
 
-        // this creates a validator deployed via an EigenPod once the DepositQueue has at least 32 ETH in it
+        // creates a validator deployed via an EigenPod once the DepositQueue has at least 32 ETH in it
         depositQueue.stakeEthFromQueue(operatorDelegator, pubkey, signature, depositDataRoot);
 
         // update shares of the OperatorDelegator (EigenPod owner) to simulate a validation of a beacon chain state proof of the validator balance
-        // NOTE: shares of EigenPod are exchangeable 1:1 with the ETH staked in the validator node
         address podAddress = address(eigenPodManager.getPod(address(operatorDelegator)));
-        // need to prank as the pod to be able to update share accounting
         vm.prank(podAddress);
         eigenPodManager.recordBeaconChainETHBalanceUpdate(address(operatorDelegator), 32 ether);
     }
 
-    // NOTE: this is needed for handling gas refunds from call to stakeEthFromQueue
+    /// @notice needed for handling gas refunds from call to stakeEthFromQueue
     fallback() external {}
 }

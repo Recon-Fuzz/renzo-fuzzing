@@ -154,7 +154,7 @@ abstract contract RestakeManagerTargets is BaseTargetFunctions, Setup {
 
         // increase the price in the exchange rate of the oracle to reflect the rebase event
         (, int256 currentPrice, , , ) = collateralTokenOracle.latestRoundData();
-        require(rebasedPrice > currentPrice); // rebase increases price, decrease in price would be handled by the restakeManager_LST_discount function
+        require(rebasedPrice > currentPrice); // rebase increases price, decreases in price are handled by the restakeManager_LST_discount function
 
         // set new price in oracle
         collateralTokenOracle.setPrice(rebasedPrice);

@@ -6,7 +6,7 @@ import { RenzoSetup } from "./RenzoSetup.sol";
 
 abstract contract Setup is RenzoSetup, BaseSetup {
     function setup() internal virtual override {
-        // NOTE: this deploys the renzo system, this includes deploying a local version of EigenLayer
+        deployEigenLayerLocal();
         deployRenzo();
     }
 }
