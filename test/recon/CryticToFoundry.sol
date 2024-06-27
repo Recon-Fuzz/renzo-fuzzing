@@ -89,7 +89,7 @@ contract CryticToFoundry is
         (, int256 priceBefore, , , ) = collateralTokenOracle.latestRoundData();
         console2.log("priceBefore: %e", priceBefore);
 
-        restakeManager_LST_rebase(collateralToken, 2e18);
+        restakeManager_LST_rebase(0, 2e18);
 
         (, int256 priceAfter, , , ) = collateralTokenOracle.latestRoundData();
         console2.log("priceAfter: %e", priceAfter);
@@ -104,7 +104,7 @@ contract CryticToFoundry is
         (, int256 priceBefore, , , ) = collateralTokenOracle.latestRoundData();
         console2.log("priceBefore: ", priceBefore);
 
-        restakeManager_LST_discount(collateralToken, 500);
+        restakeManager_LST_discount(0, 500);
 
         (, int256 priceAfter, , , ) = collateralTokenOracle.latestRoundData();
         console2.log("priceAfter: ", priceAfter);

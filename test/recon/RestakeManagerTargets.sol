@@ -128,7 +128,8 @@ abstract contract RestakeManagerTargets is BaseTargetFunctions, Setup {
     }
 
     /// @notice simulates a discount in the price of an LST token in the system via the price returned by the oracle
-    function restakeManager_LST_discount(address collateralToken, int256 discount) public {
+    function restakeManager_LST_discount(uint256 collateralTokenIndex, int256 discount) public {
+        address collateralToken = _getRandomDepositableToken(collateralTokenIndex);
         MockAggregatorV3 collateralTokenOracle = collateralTokenOracles[collateralToken];
 
         // apply discount to current price
@@ -145,7 +146,8 @@ abstract contract RestakeManagerTargets is BaseTargetFunctions, Setup {
 
     /// @notice simulates a rebase of an LST token as a corresponding increase in the price of the LST token relative to ezETH
     /// @dev see shared_LST_interface for a more detailed description of the design decisions
-    function restakeManager_LST_rebase(address collateralToken, int256 rebasedPrice) public {
+    function restakeManager_LST_rebase(uint256 collateralTokenIndex, int256 rebasedPrice) public {
+        address collateralToken = _getRandomDepositableToken(collateralTokenIndex);
         // check that the last rebase was > 24 hours ago because rebases only happen once daily when beacon chain ether balance is updated
         require(block.timestamp >= lastRebase + 24 hours);
 
