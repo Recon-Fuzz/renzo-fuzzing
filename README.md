@@ -34,6 +34,10 @@ git clone --recurse-submodules https://github.com/nican0r/renzo-fuzzing
 npm install
 forge install
 ```
+## Fuzzing 
+Because this repo has been scaffolded with Recon, it automatically works for running jobs using Recon's cloud runner. 
+
+For an example 12hr job run with Medusa, see [here](https://getrecon.xyz/shares/954343b5-87e7-4822-8e3f-b0414723121d)
 
 ### Fuzzing with Echidna
 ```bash
