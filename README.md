@@ -6,7 +6,7 @@ Learn more about the standard Recon harness [here](https://getrecon.substack.com
 
 ### System Setup
 
-This suite integrates a full local deployment of the EigenLayer system (provided by this [repo](https://github.com/nican0r/eigenlayer-fuzzing/tree/main)) with a fuzzing scaffolding of the Renzo system to test Renzo invariants.
+This suite integrates a full local deployment of the EigenLayer system (provided by this [repo](https://github.com/Recon-Fuzz/eigenlayer-fuzzing/tree/main)) with a fuzzing scaffolding of the Renzo system to test Renzo invariants.
 
 The EigenLayer system is added as a dependency in the eigenlayer-fuzzing submodule. 
 
@@ -18,14 +18,14 @@ Clamping has been applied for certain target functions to limit the fuzzer searc
 
 The following externalities that may have side-effects within the Renzo system have been implemented to facilitate more realistic fuzzing of these types of events:
 
-- [Native ETH slashing](https://github.com/nican0r/renzo-fuzzing/blob/4364ec80cce740bbafb09be1aab8929faf3e1c96/test/recon/RestakeManagerTargets.sol#L120-L124)
-- [AVS slashing](https://github.com/nican0r/renzo-fuzzing/blob/4364ec80cce740bbafb09be1aab8929faf3e1c96/test/recon/RestakeManagerTargets.sol#L127-L135)
-- [LST discounting](https://github.com/nican0r/renzo-fuzzing/blob/4364ec80cce740bbafb09be1aab8929faf3e1c96/test/recon/RestakeManagerTargets.sol#L138-L152)
-- [LST rebasing](https://github.com/nican0r/renzo-fuzzing/blob/4364ec80cce740bbafb09be1aab8929faf3e1c96/test/recon/RestakeManagerTargets.sol#L156-L172)
+- [Native ETH slashing](https://github.com/Recon-Fuzz/renzo-fuzzing/blob/4364ec80cce740bbafb09be1aab8929faf3e1c96/test/recon/RestakeManagerTargets.sol#L120-L124)
+- [AVS slashing](https://github.com/Recon-Fuzz/renzo-fuzzing/blob/4364ec80cce740bbafb09be1aab8929faf3e1c96/test/recon/RestakeManagerTargets.sol#L127-L135)
+- [LST discounting](https://github.com/Recon-Fuzz/renzo-fuzzing/blob/4364ec80cce740bbafb09be1aab8929faf3e1c96/test/recon/RestakeManagerTargets.sol#L138-L152)
+- [LST rebasing](https://github.com/Recon-Fuzz/renzo-fuzzing/blob/4364ec80cce740bbafb09be1aab8929faf3e1c96/test/recon/RestakeManagerTargets.sol#L156-L172)
 
 These have all been implemented as target functions in the `RestakManagerTargetFunctions` contract, and therefore will automatically be called in the default fuzz testing setup.
 
-For more detail on the implementation and design decisions behind each, see the [externalities.md](https://github.com/nican0r/renzo-fuzzing/blob/main/externalities.md) file.
+For more detail on the implementation and design decisions behind each, see the [externalities.md](https://github.com/Recon-Fuzz/renzo-fuzzing/blob/main/externalities.md) file.
 
 ### Setup
 
