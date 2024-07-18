@@ -30,7 +30,7 @@ For more detail on the implementation and design decisions behind each, see the 
 ### Setup
 
 ```bash
-git clone --recurse-submodules https://github.com/nican0r/renzo-fuzzing
+git clone --recurse-submodules https://github.com/Recon-Fuzz/renzo-fuzzing
 npm install
 forge install
 ```
