@@ -189,9 +189,10 @@ contract RenzoSetup is EigenLayerSystem {
 
         // initializing this with an empty buffer array, tokens are added to withdrawBuffer in deployTokenStratOperatorDelegator
         WithdrawQueueStorageV1.TokenWithdrawBuffer[]
-            memory withdrawBuffer = new WithdrawQueueStorageV1.TokenWithdrawBuffer[](1);
-        // NOTE: adding ezETH to withdraw buffer array because it can't be used for initialization if array is empty
-        withdrawBuffer[0] = WithdrawQueueStorageV1.TokenWithdrawBuffer(address(ezETH), 10_000);
+            memory withdrawBuffer = new WithdrawQueueStorageV1.TokenWithdrawBuffer[](2);
+        // create initial withdrawal buffer
+        withdrawBuffer[0] = WithdrawQueueStorageV1.TokenWithdrawBuffer(address(stETH), 20);
+        withdrawBuffer[1] = WithdrawQueueStorageV1.TokenWithdrawBuffer(address(wbETH), 20);
 
         withdrawQueue.initialize(
             roleManager,
