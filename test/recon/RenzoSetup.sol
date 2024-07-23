@@ -202,6 +202,7 @@ contract RenzoSetup is EigenLayerSystem {
             7 days,
             withdrawBuffer
         );
+        ezETH.approve(address(withdrawQueue), type(uint256).max);
 
         // set WithdrawQueue in DepositQueue
         depositQueue.setWithdrawQueue(IWithdrawQueue(address(withdrawQueue)));
@@ -209,6 +210,7 @@ contract RenzoSetup is EigenLayerSystem {
         depositQueue.setRestakeManager(IRestakeManager(address(restakeManager)));
         // Allow the restake manager to mint and burn ezETH tokens
         roleManager.grantRole(roleManager.RX_ETH_MINTER_BURNER(), address(restakeManager));
+        roleManager.grantRole(roleManager.RX_ETH_MINTER_BURNER(), address(withdrawQueue));
 
         // deploy the RewardHandler
         rewardHandlerImplementation = new RewardHandler();
