@@ -9,8 +9,8 @@ import { Setup } from "./Setup.sol";
 import { IOperatorDelegator } from "../../../contracts/Delegation/IOperatorDelegator.sol";
 
 /// @notice this encompasses all admin permissions, not only the ones defined by the RESTAKE_MANAGER_ADMIN role in Renzo
-abstract contract RestakeManagerAdminTargets is BaseTargetFunctions, Setup {
-    function restakeManagerAdmin_setOperatorDelegatorAllocation(
+abstract contract AdminTargets is BaseTargetFunctions, Setup {
+    function admin_setOperatorDelegatorAllocation(
         uint256 operatorDelegatorIndex,
         uint256 allocationBasisPoints
     ) public {
@@ -24,11 +24,11 @@ abstract contract RestakeManagerAdminTargets is BaseTargetFunctions, Setup {
         );
     }
 
-    function restakeManagerAdmin_setPaused(bool paused) public {
+    function admin_setPaused(bool paused) public {
         restakeManager.setPaused(paused);
     }
 
-    function restakeManagerAdmin_setMaxDepositTVL(uint256 maxDeposit) public {
+    function admin_setMaxDepositTVL(uint256 maxDeposit) public {
         restakeManager.setMaxDepositTVL(maxDeposit);
     }
 }

@@ -6,15 +6,17 @@ import { Test } from "forge-std/Test.sol";
 import { console2 } from "forge-std/console2.sol";
 
 import { RestakeManagerTargets } from "./RestakeManagerTargets.sol";
-import { RestakeManagerAdminTargets } from "./RestakeManagerAdminTargets.sol";
+import { AdminTargets } from "./AdminTargets.sol";
 import { DepositQueueTargets } from "./DepositQueueTargets.sol";
+import { WithdrawQueueTargets } from "./WithdrawQueueTargets.sol";
 import "../mocks/MockAggregatorV3.sol";
 
 contract CryticToFoundry is
     Test,
     RestakeManagerTargets,
-    RestakeManagerAdminTargets,
+    AdminTargets,
     DepositQueueTargets,
+    WithdrawQueueTargets,
     FoundryAsserts
 {
     function setUp() public {
@@ -110,6 +112,51 @@ contract CryticToFoundry is
         console2.log("priceAfter: ", priceAfter);
 
         assertTrue(priceBefore != priceAfter, "price doesn't change");
+    }
+
+    function test_withdraw() public {
+        restakeManager_deposit(0, 42);
+
+        withdrawQueueTargets_withdraw(5, 0);
+    }
+
+    function test_claim() public {
+        restakeManager_deposit(0, 42);
+
+        withdrawQueueTargets_withdraw(5, 0);
+        vm.warp(block.timestamp + 8 days); // warp past withdrawal delay period
+        withdrawQueueTargets_claim(0);
+    }
+
+    function test_H05_exploit() public {
+        // user deposits to receive ezETH
+        restakeManager_deposit(0, 30);
+
+        // user triggers a withdrawal
+        withdrawQueueTargets_withdraw(5, 0);
+
+        // redeemable amount changes due to slashing
+        // NOTE: using the first OD's index
+        restakeManager_slash_AVS(0, 0, 15);
+        console2.log("reaches end of AVS slash");
+
+        // user claims more than their fair share
+        vm.warp(block.timestamp + 8 days); // warp past withdrawal delay period
+
+        // need to update oracle price because it expires after delay
+        {
+            MockAggregatorV3 collateralTokenOracle1 = collateralTokenOracles[address(stETH)];
+            (, int256 currentPrice1, , uint256 timeUpdated1, ) = collateralTokenOracle1
+                .latestRoundData();
+            collateralTokenOracle1.setPrice(currentPrice1);
+
+            MockAggregatorV3 collateralTokenOracle2 = collateralTokenOracles[address(wbETH)];
+            (, int256 currentPrice2, , uint256 timeUpdated2, ) = collateralTokenOracle2
+                .latestRoundData();
+            collateralTokenOracle2.setPrice(currentPrice2);
+        }
+
+        withdrawQueueTargets_claim(0);
     }
 
     // NOTE: this is needed for handling gas refunds when testing calls to depositQueue_stakeEthFromQueue
