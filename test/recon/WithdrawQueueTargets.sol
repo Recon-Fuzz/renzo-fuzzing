@@ -12,6 +12,7 @@ import { console2 } from "forge-std/console2.sol";
 
 import { BeforeAfter } from "./BeforeAfter.sol";
 import { Setup } from "./Setup.sol";
+import { WithdrawQueueStorageV1 } from "../../contracts/Withdraw/WithdrawQueueStorage.sol";
 import "../mocks/MockAggregatorV3.sol";
 
 abstract contract WithdrawQueueTargets is BaseTargetFunctions, Setup, BeforeAfter {
@@ -32,14 +33,29 @@ abstract contract WithdrawQueueTargets is BaseTargetFunctions, Setup, BeforeAfte
         uint256 withdrawQueueLength = withdrawQueue.getOutstandingWithdrawRequests(address(this)); //assumes the caller of withdraw is always the target contract (no other actors)
         withdrawRequestIndex = withdrawRequestIndex % withdrawQueueLength;
 
-        __before(address(this), withdrawRequestIndex);
+        (
+            address collateralToken,
+            uint256 withdrawRequestID,
+            uint256 amountToRedeem,
+            uint256 ezETHLocked,
+            uint256 createdAt
+        ) = withdrawQueue.withdrawRequests(address(this), withdrawRequestIndex);
+
+        WithdrawQueueStorageV1.WithdrawRequest memory withdrawRequest = WithdrawQueueStorageV1
+            .WithdrawRequest({
+                collateralToken: collateralToken,
+                withdrawRequestID: withdrawRequestID,
+                amountToRedeem: amountToRedeem,
+                ezETHLocked: ezETHLocked,
+                createdAt: createdAt
+            });
 
         withdrawQueue.claim(withdrawRequestIndex);
 
         // check that user can't withdraw more than the expected amount when they initially submitted a withdrawal request
         // the amountToRedeem if recalculated after should be the same as the initial amountToRedeem
-        uint256 initialAmountToRedeem = _before.withdrawRequest.amountToRedeem;
-        uint256 initialezETHLocked = _before.withdrawRequest.ezETHLocked;
+        uint256 initialAmountToRedeem = withdrawRequest.amountToRedeem;
+        uint256 initialezETHLocked = withdrawRequest.ezETHLocked;
 
         // calculate how much the amount to redeem would be on claim
         (, , uint256 totalTVL) = restakeManager.calculateTVLs();
