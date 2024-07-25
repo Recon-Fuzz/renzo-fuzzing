@@ -287,6 +287,9 @@ contract RenzoSetup is EigenLayerSystem {
         operatorDelegators.push(operatorDelegator1);
         operatorDelegators.push(operatorDelegator2);
 
+        roleManager.grantRole(roleManager.NATIVE_ETH_RESTAKE_ADMIN(), address(operatorDelegator1));
+        roleManager.grantRole(roleManager.NATIVE_ETH_RESTAKE_ADMIN(), address(operatorDelegator1));
+
         // add operator delegators to RestakeManager
         restakeManager.addOperatorDelegator(
             IOperatorDelegator(address(operatorDelegator1)),

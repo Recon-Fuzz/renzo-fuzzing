@@ -9,6 +9,7 @@ import { RestakeManagerTargets } from "./RestakeManagerTargets.sol";
 import { AdminTargets } from "./AdminTargets.sol";
 import { DepositQueueTargets } from "./DepositQueueTargets.sol";
 import { WithdrawQueueTargets } from "./WithdrawQueueTargets.sol";
+import { OperatorDelegatorTargets } from "./OperatorDelegatorTargets.sol";
 import "../mocks/MockAggregatorV3.sol";
 
 contract CryticToFoundry is
@@ -17,6 +18,7 @@ contract CryticToFoundry is
     AdminTargets,
     DepositQueueTargets,
     WithdrawQueueTargets,
+    OperatorDelegatorTargets,
     FoundryAsserts
 {
     function setUp() public {
@@ -126,6 +128,39 @@ contract CryticToFoundry is
         withdrawQueueTargets_withdraw(5, 0);
         vm.warp(block.timestamp + 8 days); // warp past withdrawal delay period
         withdrawQueueTargets_claim(0);
+    }
+
+    function test_queueWithdrawals() public {
+        restakeManager_clamped_depositETH();
+
+        // DepositQueue calls stakeEthInOperatorDelegator to create a new validator for OperatorDelegator at index 0
+        bytes memory pubkey = hex"123456";
+        bytes memory signature = hex"789101";
+        bytes32 dataRoot = bytes32(uint256(0xbeef));
+
+        depositQueue_stakeEthFromQueue(0, pubkey, signature, dataRoot);
+
+        operatorDelegator_queueWithdrawals(0, 33 ether);
+    }
+
+    ///@notice fails because of the reentrancy guard as outlined in the vulnerability
+    function test_H03_exploit() public {
+        restakeManager_clamped_depositETH();
+        restakeManager_clamped_depositETH();
+
+        // DepositQueue calls stakeEthInOperatorDelegator to create a new validator for OperatorDelegator at index 0
+        bytes memory pubkey = hex"123456";
+        bytes memory signature = hex"789101";
+        bytes32 dataRoot = bytes32(uint256(0xbeef));
+
+        depositQueue_stakeEthFromQueue(0, pubkey, signature, dataRoot);
+
+        operatorDelegator_queueWithdrawals(0, 288 ether);
+
+        // @audit probably need to warp time before call to complete to handle withdrawal delay
+        // call to completeQueuedWithdrawal should revert for reason highlighted in vuln
+        vm.warp(block.timestamp + 8 days);
+        operatorDelegator_completeQueuedWithdrawal(0);
     }
 
     function test_H05_exploit() public {
