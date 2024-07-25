@@ -7,51 +7,19 @@ import { console2 } from "forge-std/console2.sol";
 
 abstract contract BeforeAfter is Setup {
     struct Vars {
-        WithdrawQueueStorageV1.WithdrawRequest withdrawRequest;
+        uint256 totalTVL;
     }
 
     Vars internal _before;
     Vars internal _after;
 
-    function __before(address user, uint256 withdrawRequestIndex) internal {
-        (
-            address collateralToken,
-            uint256 withdrawRequestID,
-            uint256 amountToRedeem,
-            uint256 ezETHLocked,
-            uint256 createdAt
-        ) = withdrawQueue.withdrawRequests(user, withdrawRequestIndex);
-
-        WithdrawQueueStorageV1.WithdrawRequest memory withdrawRequest = WithdrawQueueStorageV1
-            .WithdrawRequest({
-                collateralToken: collateralToken,
-                withdrawRequestID: withdrawRequestID,
-                amountToRedeem: amountToRedeem,
-                ezETHLocked: ezETHLocked,
-                createdAt: createdAt
-            });
-
-        _before.withdrawRequest = withdrawRequest;
+    function __before() internal {
+        (, , uint256 totalTVL) = restakeManager.calculateTVLs();
+        _before.totalTVL = totalTVL;
     }
 
-    function __after(address user, uint256 withdrawRequestIndex) internal {
-        (
-            address collateralToken,
-            uint256 withdrawRequestID,
-            uint256 amountToRedeem,
-            uint256 ezETHLocked,
-            uint256 createdAt
-        ) = withdrawQueue.withdrawRequests(user, withdrawRequestIndex);
-
-        WithdrawQueueStorageV1.WithdrawRequest memory withdrawRequest = WithdrawQueueStorageV1
-            .WithdrawRequest({
-                collateralToken: collateralToken,
-                withdrawRequestID: withdrawRequestID,
-                amountToRedeem: amountToRedeem,
-                ezETHLocked: ezETHLocked,
-                createdAt: createdAt
-            });
-
-        _after.withdrawRequest = withdrawRequest;
+    function __after() internal {
+        (, , uint256 totalTVL) = restakeManager.calculateTVLs();
+        _after.totalTVL = totalTVL;
     }
 }

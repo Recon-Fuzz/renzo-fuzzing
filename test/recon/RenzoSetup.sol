@@ -127,8 +127,8 @@ contract RenzoSetup is EigenLayerSystem {
         );
 
         // mint tokens to test contract
-        stETH.mint(address(this), 10_000_000);
-        wbETH.mint(address(this), 10_000_000);
+        stETH.mint(address(this), 10_000_000e18);
+        wbETH.mint(address(this), 10_000_000e18);
 
         collateralTokens.push(address(stETH));
         collateralTokens.push(address(wbETH));

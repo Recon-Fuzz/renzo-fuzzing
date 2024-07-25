@@ -31,7 +31,7 @@ abstract contract OperatorDelegatorTargets is BaseTargetFunctions, Setup, Before
     );
 
     /// @notice queues withdrawals only for native ETH
-    function operatorDelegator_queueWithdrawals(
+    function operatorDelegator_queueWithdrawalsNative(
         uint256 operatorDelegatorIndex,
         uint256 tokenAmounts
     ) public {
@@ -49,9 +49,13 @@ abstract contract OperatorDelegatorTargets is BaseTargetFunctions, Setup, Before
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = tokenAmounts;
 
+        __before();
+
         uint96 nonce = uint96(delegation.cumulativeWithdrawalsQueued(address(operatorDelegator)));
         // NOTE: this uses a simplification where only one collateral token type is queued for withdrawal at a time
         operatorDelegator.queueWithdrawals(tokens, amounts);
+
+        __after();
 
         IStrategy[] memory strategies = new IStrategy[](1);
         strategies[0] = IStrategy(address(eigenPodManager.beaconChainETHStrategy())); // since only using native ETH in this case, strategy is from eigenPodManager
@@ -65,17 +69,71 @@ abstract contract OperatorDelegatorTargets is BaseTargetFunctions, Setup, Before
             strategies: strategies,
             shares: amounts
         });
-        // emit WithrawalFromTargets(
-        //     address(operatorDelegator),
-        //     operatorDelegator.delegateAddress(),
-        //     address(operatorDelegator),
-        //     nonce,
-        //     uint32(block.number),
-        //     strategies,
-        //     amounts
-        // );
 
         eigenLayerWithdrawalRequestsGhost.push(withdrawal);
+
+        eq(_before.totalTVL, _after.totalTVL, "totalTVL changes after withdrawal is queued");
+    }
+
+    /// @notice queue single token withdrawal at a time
+    function operatorDelegator_queueWithdrawals(
+        uint256 operatorDelegatorIndex,
+        uint256 tokenAmounts,
+        uint256 tokenIndex
+    ) public {
+        OperatorDelegator operatorDelegator = OperatorDelegator(
+            payable(address(_getRandomOperatorDelegator(operatorDelegatorIndex)))
+        );
+
+        tokenIndex = tokenIndex % 3; // using 3 instead of collateralTokens length [stETH, wbETH] because it doesn't include native ETH
+
+        IERC20 collateralToken;
+        // IStrategy strategy;
+        IStrategy[] memory strategies = new IStrategy[](1);
+        if (tokenIndex == 0) {
+            strategies[0] = IStrategy(address(eigenPodManager.beaconChainETHStrategy())); // since only using native ETH in this case, strategy is from eigenPodManager
+            uint256 nativeEthShares = uint256(
+                eigenPodManager.podOwnerShares(address(operatorDelegator))
+            );
+            tokenAmounts = tokenAmounts % nativeEthShares;
+
+            collateralToken = IERC20(IS_NATIVE);
+        } else {
+            collateralToken = IERC20(_getRandomDepositableToken(tokenIndex - 1));
+            strategies[0] = operatorDelegator.tokenStrategyMapping(collateralToken);
+            uint256 lstShares = strategies[0].shares(address(operatorDelegator));
+
+            uint256 amountLSTShares = tokenAmounts % lstShares;
+            tokenAmounts = strategies[0].sharesToUnderlyingView(amountLSTShares);
+        }
+
+        IERC20[] memory tokens = new IERC20[](1);
+        tokens[0] = collateralToken;
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = tokenAmounts;
+
+        __before();
+
+        uint96 nonce = uint96(delegation.cumulativeWithdrawalsQueued(address(operatorDelegator)));
+        // NOTE: this uses a simplification where only one collateral token type is queued for withdrawal at a time
+        operatorDelegator.queueWithdrawals(tokens, amounts);
+
+        __after();
+
+        // create and store the Withdrawal struct here because queueWithdrawals only returns a byte array
+        IDelegationManager.Withdrawal memory withdrawal = IDelegationManager.Withdrawal({
+            staker: address(operatorDelegator),
+            delegatedTo: operatorDelegator.delegateAddress(),
+            withdrawer: address(operatorDelegator),
+            nonce: nonce,
+            startBlock: uint32(block.number),
+            strategies: strategies,
+            shares: amounts
+        });
+
+        eigenLayerWithdrawalRequestsGhost.push(withdrawal);
+
+        eq(_before.totalTVL, _after.totalTVL, "totalTVL changes after withdrawal is queued");
     }
 
     function operatorDelegator_completeQueuedWithdrawal(uint256 operatorDelegatorIndex) public {

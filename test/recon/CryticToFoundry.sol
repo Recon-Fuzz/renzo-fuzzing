@@ -130,17 +130,10 @@ contract CryticToFoundry is
         withdrawQueueTargets_claim(0);
     }
 
-    function test_queueWithdrawals() public {
-        restakeManager_clamped_depositETH();
+    function test_H02_exploit() public {
+        restakeManager_deposit(0, 100e18);
 
-        // DepositQueue calls stakeEthInOperatorDelegator to create a new validator for OperatorDelegator at index 0
-        bytes memory pubkey = hex"123456";
-        bytes memory signature = hex"789101";
-        bytes32 dataRoot = bytes32(uint256(0xbeef));
-
-        depositQueue_stakeEthFromQueue(0, pubkey, signature, dataRoot);
-
-        operatorDelegator_queueWithdrawals(0, 33 ether);
+        operatorDelegator_queueWithdrawals(0, 50e18, 1);
     }
 
     ///@notice fails because of the reentrancy guard as outlined in the vulnerability
@@ -155,7 +148,7 @@ contract CryticToFoundry is
 
         depositQueue_stakeEthFromQueue(0, pubkey, signature, dataRoot);
 
-        operatorDelegator_queueWithdrawals(0, 288 ether);
+        operatorDelegator_queueWithdrawals(0, 288 ether, 3);
 
         // @audit probably need to warp time before call to complete to handle withdrawal delay
         // call to completeQueuedWithdrawal should revert for reason highlighted in vuln
