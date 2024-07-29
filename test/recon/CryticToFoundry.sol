@@ -166,7 +166,6 @@ contract CryticToFoundry is
         // redeemable amount changes due to slashing
         // NOTE: using the first OD's index
         restakeManager_slash_AVS(0, 0, 15);
-        console2.log("reaches end of AVS slash");
 
         // user claims more than their fair share
         vm.warp(block.timestamp + 8 days); // warp past withdrawal delay period
