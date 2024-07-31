@@ -130,13 +130,14 @@ contract CryticToFoundry is
         withdrawQueueTargets_claim(0);
     }
 
+    ///@notice H2: incorrect calculation of queued withdrawals can deflate TVL
     function test_H02_exploit() public {
         restakeManager_deposit(0, 100e18);
 
         operatorDelegator_queueWithdrawals(0, 50e18, 1);
     }
 
-    ///@notice fails because of the reentrancy guard as outlined in the vulnerability
+    ///@notice H3: ETH withdrawals from EigenLayer always fail because of nonreentrant receive()
     function test_H03_exploit() public {
         restakeManager_clamped_depositETH();
         restakeManager_clamped_depositETH();
@@ -156,6 +157,7 @@ contract CryticToFoundry is
         operatorDelegator_completeQueuedWithdrawal(0);
     }
 
+    ///@notice H5: slashing leads to unfair distribution of reserves
     function test_H05_exploit() public {
         // user deposits to receive ezETH
         restakeManager_deposit(0, 30);
@@ -175,12 +177,12 @@ contract CryticToFoundry is
             MockAggregatorV3 collateralTokenOracle1 = collateralTokenOracles[address(stETH)];
             (, int256 currentPrice1, , uint256 timeUpdated1, ) = collateralTokenOracle1
                 .latestRoundData();
-            collateralTokenOracle1.setPrice(currentPrice1);
+            restakeManager_LST_discount(0, currentPrice1);
 
             MockAggregatorV3 collateralTokenOracle2 = collateralTokenOracles[address(wbETH)];
             (, int256 currentPrice2, , uint256 timeUpdated2, ) = collateralTokenOracle2
                 .latestRoundData();
-            collateralTokenOracle2.setPrice(currentPrice2);
+            restakeManager_LST_discount(1, currentPrice1);
         }
 
         withdrawQueueTargets_claim(0);

@@ -58,6 +58,7 @@ abstract contract WithdrawQueueTargets is BaseTargetFunctions, Setup, BeforeAfte
         uint256 initialezETHLocked = withdrawRequest.ezETHLocked;
 
         // calculate how much the amount to redeem would be on claim
+        // @audit this will revert if any of the LST prices is stale, could add a forced update here to pass this as a type of clamping
         (, , uint256 totalTVL) = restakeManager.calculateTVLs();
         uint256 currentAmountToRedeem = renzoOracle.calculateRedeemAmount(
             initialezETHLocked,
@@ -65,11 +66,11 @@ abstract contract WithdrawQueueTargets is BaseTargetFunctions, Setup, BeforeAfte
             totalTVL
         );
 
-        // this could be improved by allowing for a margin that accounts for new ezETH minted/burned between call to withdrawal and claim
+        // NOTE: this could be improved by allowing for a margin that accounts for new ezETH minted/burned between call to withdrawal and claim
         eq(
             initialAmountToRedeem,
             currentAmountToRedeem,
-            "user can claim more than their fair share"
+            "H5: user can claim more than their fair share"
         );
     }
 }
