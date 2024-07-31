@@ -104,7 +104,7 @@ abstract contract OperatorDelegatorTargets is BaseTargetFunctions, Setup, Before
 
         vm.prank(address(operatorDelegator));
         try operatorDelegator.completeQueuedWithdrawal(withdrawal, tokens, 0) {} catch {
-            t(false, "admin can't withdraw from EigenLayer");
+            t(false, "H3: admin can't withdraw from EigenLayer");
         }
     }
 }
